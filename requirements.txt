@@ -1,0 +1,6 @@
+python-telegram-bot
+sqlalchemy 
+apscheduler
+python-dotenv
+openpyxl
+playwright
