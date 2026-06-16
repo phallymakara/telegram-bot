@@ -16,7 +16,8 @@ from database import (
     Report,
     AttendanceRecord,
     SessionLocal,
-    Base
+    Base,
+    record_borrow
 )
 from parser import parse_report_text_by_days
 from report_generator import generate_excel_report, generate_pdf_report
@@ -65,14 +66,21 @@ class TestIntegration(unittest.TestCase):
         # List all
         all_emps = get_all_employees()
         self.assertEqual(len(all_emps), 2)
-        self.assertEqual(all_emps["ប៉ែន ទិត្យថ្មី"], 96000)
-        self.assertEqual(all_emps["អៀម អេន"], 64000)
+        self.assertEqual(all_emps["ប៉ែន ទិត្យថ្មី"]["rate"], 96000)
+        self.assertEqual(all_emps["អៀម អេន"]["rate"], 64000)
 
         # Delete employee
         success = delete_employee("អៀម អេន")
         self.assertTrue(success)
         self.assertIsNone(get_employee_rate("អៀម អេន"))
         self.assertEqual(len(get_all_employees()), 1)
+
+        # Test gender registration
+        success = add_employee("ធិន", 30000, "ស")
+        self.assertTrue(success)
+        all_emps = get_all_employees()
+        self.assertEqual(all_emps["ធិន"]["rate"], 30000)
+        self.assertEqual(all_emps["ធិន"]["gender"], "ស")
 
     def test_bulk_add_parsing_logic(self):
         content = """
@@ -96,8 +104,8 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(parsed[1], ("អៀម អេន", 64000.0))
         
         all_emps = get_all_employees()
-        self.assertEqual(all_emps["ប៉ែន ទិត្យ"], 80000.0)
-        self.assertEqual(all_emps["អៀម អេន"], 64000.0)
+        self.assertEqual(all_emps["ប៉ែន ទិត្យ"]["rate"], 80000.0)
+        self.assertEqual(all_emps["អៀម អេន"]["rate"], 64000.0)
 
     def test_report_processing(self):
         # Register workers with daily rates
@@ -304,62 +312,76 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(ws["A1"].value, "ព័ត៌មានលម្អិតប្រចាំថ្ងៃ")
         
         # Check header row (row 3)
-        headers = [ws.cell(row=3, column=col).value for col in range(1, 8)]
-        self.assertEqual(headers[0], "ល.រ")
-        self.assertEqual(headers[1], "ឈ្មោះបុគ្គលិក")
-        self.assertEqual(headers[2], "1") # Day 1
-        self.assertEqual(headers[3], "2") # Day 2
-        self.assertEqual(headers[4], "ម៉ោងសរុប")
-        self.assertEqual(headers[5], "ប្រាក់ត្រូវបើក (USD)")
-        self.assertEqual(headers[6], "ប្រាក់ត្រូវបើក (KHR)")
+        self.assertEqual(ws.cell(row=3, column=1).value, "លរ")
+        self.assertEqual(ws.cell(row=3, column=2).value, "ឈ្មោះ")
+        self.assertEqual(ws.cell(row=3, column=3).value, "ភេទ")
+        self.assertEqual(ws.cell(row=3, column=4).value, "តម្លៃ(៛)/ថ្ងៃ")
+        self.assertEqual(ws.cell(row=3, column=5).value, "តម្លៃ(៛)/ម៉ោង")
+        
+        self.assertEqual(ws.cell(row=3, column=6).value, "1") # Day 1 Date
+        self.assertEqual(ws.cell(row=3, column=10).value, "2") # Day 2 Date
+        
+        # Check subheaders row (row 4)
+        self.assertEqual(ws.cell(row=4, column=6).value, "Day")
+        self.assertEqual(ws.cell(row=4, column=7).value, "OT(h)")
+        self.assertEqual(ws.cell(row=4, column=8).value, "Borrow")
+        self.assertEqual(ws.cell(row=4, column=9).value, "Project")
+        
+        self.assertEqual(ws.cell(row=3, column=14).value, "សរុបថ្ងៃធ្វើការ")
+        self.assertEqual(ws.cell(row=3, column=15).value, "សរុបថែមម៉ោង")
+        self.assertEqual(ws.cell(row=3, column=16).value, "លុយសរុប")
+        self.assertEqual(ws.cell(row=3, column=17).value, "លុយបានខ្ចី សរុប")
+        self.assertEqual(ws.cell(row=3, column=18).value, "ប្រាក់កាត់")
+        self.assertEqual(ws.cell(row=3, column=19).value, "លុយត្រូវបើក")
         
         # Check employee names
-        emp1_name = ws.cell(row=4, column=2).value
-        emp2_name = ws.cell(row=5, column=2).value
+        emp1_name = ws.cell(row=5, column=2).value
+        emp2_name = ws.cell(row=6, column=2).value
         
         names = [emp1_name, emp2_name]
         self.assertIn("ប៉ែន ទិត្យ", names)
         self.assertIn("អៀម អេន", names)
         
-        # Verify font and bold style for names and values
-        self.assertEqual(ws.cell(row=4, column=2).font.name, "Times New Roman")
-        self.assertFalse(ws.cell(row=4, column=2).font.bold)
+        # Verify font and style for names and values
         self.assertEqual(ws.cell(row=5, column=2).font.name, "Times New Roman")
-        self.assertFalse(ws.cell(row=5, column=2).font.bold)
+        self.assertEqual(ws.cell(row=6, column=2).font.name, "Times New Roman")
         
-        self.assertEqual(ws.cell(row=4, column=3).font.name, "Times New Roman")
-        
-        pen_row = 4 if emp1_name == "ប៉ែន ទិត្យ" else 5
-        iam_row = 5 if pen_row == 4 else 4
+        pen_row = 5 if emp1_name == "ប៉ែន ទិត្យ" else 6
+        iam_row = 6 if pen_row == 5 else 5
         
         # Check values
-        self.assertEqual(ws.cell(row=pen_row, column=3).value, 8.0)
-        self.assertEqual(ws.cell(row=pen_row, column=4).value, 6.0)
-        self.assertEqual(ws.cell(row=pen_row, column=5).value, f"=SUM(C{pen_row}:D{pen_row})")
-        self.assertEqual(ws.cell(row=pen_row, column=6).value, f"=G{pen_row}/4000.0")
-        self.assertEqual(ws.cell(row=pen_row, column=7).value, 140000.0)
+        self.assertEqual(ws.cell(row=pen_row, column=4).value, 80000.0) # Rate/day
+        self.assertEqual(ws.cell(row=pen_row, column=5).value, f"=D{pen_row}/8") # Rate/hour
+        self.assertEqual(ws.cell(row=pen_row, column=6).value, 1.0) # Day 1 base day
+        self.assertEqual(ws.cell(row=pen_row, column=7).value, 0.0) # Day 1 OT
+        self.assertEqual(ws.cell(row=pen_row, column=10).value, 0.75) # Day 2 base day
+        self.assertEqual(ws.cell(row=pen_row, column=11).value, 0.0) # Day 2 OT
         
-        self.assertEqual(ws.cell(row=iam_row, column=3).value, 7.5)
-        self.assertIn(ws.cell(row=iam_row, column=4).value, [None, ""])
-        self.assertEqual(ws.cell(row=iam_row, column=5).value, f"=SUM(C{iam_row}:D{iam_row})")
-        self.assertEqual(ws.cell(row=iam_row, column=6).value, f"=G{iam_row}/4000.0")
-        self.assertEqual(ws.cell(row=iam_row, column=7).value, 60000.0)
+        self.assertEqual(ws.cell(row=pen_row, column=14).value, f"=F{pen_row}+J{pen_row}") # Total days worked formula
+        self.assertEqual(ws.cell(row=pen_row, column=15).value, f"=G{pen_row}+K{pen_row}") # Total OT formula
+        self.assertEqual(ws.cell(row=pen_row, column=16).value, f"=(N{pen_row}*D{pen_row})+(O{pen_row}*E{pen_row})") # Total salary formula
+        self.assertEqual(ws.cell(row=pen_row, column=17).value, f"=H{pen_row}+L{pen_row}") # Borrow formula
+        self.assertEqual(ws.cell(row=pen_row, column=19).value, f"=P{pen_row}-Q{pen_row}-R{pen_row}") # Net formula
         
-        # Total Row (row 6)
-        self.assertEqual(ws.cell(row=6, column=1).value, "សរុប")
-        self.assertEqual(ws.cell(row=6, column=3).value, "=SUM(C4:C5)")
-        self.assertEqual(ws.cell(row=6, column=4).value, "=SUM(D4:D5)")
-        self.assertEqual(ws.cell(row=6, column=5).value, "=SUM(E4:E5)")
-        self.assertEqual(ws.cell(row=6, column=6).value, "=SUM(F4:F5)")
-        self.assertEqual(ws.cell(row=6, column=7).value, "=SUM(G4:G5)")
+        self.assertEqual(ws.cell(row=iam_row, column=4).value, 64000.0)
+        self.assertEqual(ws.cell(row=iam_row, column=6).value, 7.5 / 8.0)
+        self.assertEqual(ws.cell(row=iam_row, column=7).value, 0.0)
+        self.assertIn(ws.cell(row=iam_row, column=10).value, [None, ""]) # Did not work day 2
+        
+        # Total Row (row 7)
+        self.assertEqual(ws.cell(row=7, column=1).value, "សរុប")
+        self.assertEqual(ws.cell(row=7, column=6).value, "=SUM(F5:F6)")
+        self.assertEqual(ws.cell(row=7, column=7).value, "=SUM(G5:G6)")
+        self.assertEqual(ws.cell(row=7, column=14).value, "=SUM(N5:N6)")
+        self.assertEqual(ws.cell(row=7, column=16).value, "=SUM(P5:P6)")
+        self.assertEqual(ws.cell(row=7, column=19).value, "=SUM(S5:S6)")
  
-        # Verify summary sheet font properties
+        # Verify summary sheet properties
         ws_sum = wb["Summary"]
         self.assertEqual(ws_sum["A1"].font.name, "Times New Roman")
         self.assertEqual(ws_sum["A2"].font.name, "Times New Roman")
         self.assertEqual(ws_sum.cell(row=4, column=1).font.name, "Times New Roman")
         self.assertEqual(ws_sum.cell(row=5, column=1).font.name, "Times New Roman")
-        self.assertFalse(ws_sum.cell(row=5, column=1).font.bold)
         
         # Cleanup
         if os.path.exists(output_path):
@@ -501,6 +523,88 @@ class TestIntegration(unittest.TestCase):
             self.assertEqual(db.query(Report).count(), 0)
             self.assertEqual(db.query(AttendanceRecord).count(), 0)
             self.assertEqual(len(get_all_employees()), 1)
+        finally:
+            db.close()
+
+    def test_borrow_feature(self):
+        # 1. Setup Employee
+        add_employee("ប៉ែន ទិត្យ", 80000)
+        
+        # 2. Save Attendance Report
+        from datetime import timezone, timedelta, datetime
+        tz_kh = timezone(timedelta(hours=7))
+        today_str = datetime.now(tz_kh).strftime("%d-%b-%Y")
+        
+        workers = [
+            {'index': 1, 'name': "ប៉ែន ទិត្យ", 'hours': 8.0, 'note': "MEP"}
+        ]
+        save_attendance_report(today_str, f"ថ្ងៃទី: {today_str} (07:00 AM - 05:00 PM)", workers)
+        
+        # 3. Test record_borrow with deduction thresholds
+        # Threshold 1: <= 200,000 => deduction = 0
+        success, name, r_day = record_borrow("ប៉ែន ទិត្យ", 150000, 0)
+        self.assertTrue(success)
+        self.assertEqual(name, "ប៉ែន ទិត្យ")
+        
+        # Verify database record note
+        db = SessionLocal()
+        try:
+            rec = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == "ប៉ែន ទិត្យ").first()
+            self.assertIn("ខ្ចី 150000", rec.note)
+            self.assertNotIn("កាត់", rec.note)
+            self.assertIn("MEP", rec.note) # original note preserved
+        finally:
+            db.close()
+            
+        # Threshold 2: > 200,000 and <= 400,000 => deduction = 20,000
+        success, name, r_day = record_borrow("ប៉ែន ទិត្យ", 250000, 20000)
+        self.assertTrue(success)
+        db = SessionLocal()
+        try:
+            rec = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == "ប៉ែន ទិត្យ").first()
+            self.assertIn("ខ្ចី 250000", rec.note)
+            self.assertIn("កាត់ 20000", rec.note)
+            self.assertNotIn("150000", rec.note) # old borrow replaced
+        finally:
+            db.close()
+
+        # Threshold 3: > 400,000 => deduction = 40,000
+        success, name, r_day = record_borrow("ប៉ែន ទិត្យ", 450000, 40000)
+        self.assertTrue(success)
+        db = SessionLocal()
+        try:
+            rec = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == "ប៉ែន ទិត្យ").first()
+            self.assertIn("ខ្ចី 450000", rec.note)
+            self.assertIn("កាត់ 40000", rec.note)
+            self.assertNotIn("250000", rec.note)
+            self.assertNotIn("20000", rec.note)
+        finally:
+            db.close()
+
+        # Test carrying over on re-submission of report
+        # Re-submit report without borrow note in the input workers list
+        workers_re = [
+            {'index': 1, 'name': "ប៉ែន ទិត្យ", 'hours': 9.0, 'note': "MEP"}
+        ]
+        save_attendance_report(today_str, f"ថ្ងៃទី: {today_str} (07:00 AM - 05:00 PM)", workers_re)
+        
+        db = SessionLocal()
+        try:
+            rec = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == "ប៉ែន ទិត្យ").first()
+            self.assertEqual(rec.hours, 9.0)
+            self.assertIn("ខ្ចី 450000", rec.note)
+            self.assertIn("កាត់ 40000", rec.note)
+            self.assertIn("MEP", rec.note)
+        finally:
+            db.close()
+            
+        # Test clearing borrow (amount = 0, deduction = 0)
+        success, name, r_day = record_borrow("ប៉ែន ទិត្យ", 0, 0)
+        self.assertTrue(success)
+        db = SessionLocal()
+        try:
+            rec = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == "ប៉ែន ទិត្យ").first()
+            self.assertEqual(rec.note, "MEP") # cleanly reverted to original note
         finally:
             db.close()
 

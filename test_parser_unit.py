@@ -135,5 +135,14 @@ class TestParser(unittest.TestCase):
         self.assertEqual(d, "Monday")
         self.assertIsNone(t)
 
+    def test_hyphen_separated_note(self):
+        line = "1. ប៉ែន ទិត្យ: 9 h - A"
+        parsed = parse_report_line(line)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed['index'], 1)
+        self.assertEqual(parsed['name'], "ប៉ែន ទិត្យ")
+        self.assertEqual(parsed['hours'], 9.0)
+        self.assertEqual(parsed['note'], "A")
+
 if __name__ == '__main__':
     unittest.main()

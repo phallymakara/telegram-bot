@@ -23,6 +23,12 @@ def parse_report_line(line: str) -> dict:
     hours_str = hours_match.group(1)
     note_str = hours_match.group(2).strip() if hours_match.group(2) else None
     
+    if note_str:
+        note_str = re.sub(r'^\s*[,，;\.\s\-\/៖:]+', '', note_str)
+        note_str = re.sub(r'[,，;\.\s\-\/៖:]+$', '', note_str).strip()
+        if not note_str:
+            note_str = None
+            
     # The part before the hours is the employee's name
     name_part = remaining[:hours_match.start()].strip()
     
@@ -35,7 +41,7 @@ def parse_report_line(line: str) -> dict:
         'index': int(index_str),
         'name': name,
         'hours': float(hours_str),
-        'note': note_str if note_str else None
+        'note': note_str
     }
 
 def parse_report_text_by_days(text: str) -> list:

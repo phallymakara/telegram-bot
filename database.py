@@ -12,6 +12,7 @@ class Employee(Base):
     __tablename__ = 'employees'
     name = Column(String, primary_key=True)
     daily_rate = Column(Float, nullable=False)
+    gender = Column(String, nullable=True)
 
 class Setting(Base):
     __tablename__ = 'settings'
@@ -35,6 +36,7 @@ class AttendanceRecord(Base):
     daily_rate = Column(Float, nullable=False)
     salary = Column(Float, nullable=False)
     note = Column(String, nullable=True)
+    gender = Column(String, nullable=True)
 
 # Create engine and session
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -55,10 +57,14 @@ def init_db():
             columns = [c['name'] for c in inspector.get_columns('employees')]
             if 'hourly_rate' in columns and 'daily_rate' not in columns:
                 conn.execute(text("ALTER TABLE employees RENAME COLUMN hourly_rate TO daily_rate"))
+            if 'gender' not in columns:
+                conn.execute(text("ALTER TABLE employees ADD COLUMN gender TEXT"))
         if 'attendance' in existing_tables:
             columns = [c['name'] for c in inspector.get_columns('attendance')]
             if 'hourly_rate' in columns and 'daily_rate' not in columns:
                 conn.execute(text("ALTER TABLE attendance RENAME COLUMN hourly_rate TO daily_rate"))
+            if 'gender' not in columns:
+                conn.execute(text("ALTER TABLE attendance ADD COLUMN gender TEXT"))
                 
     Base.metadata.create_all(bind=engine)
 
@@ -97,20 +103,24 @@ def set_exchange_rate(rate: float):
     set_setting('exchange_rate', str(rate))
 
 # Utility functions
-def add_employee(name: str, daily_rate: float) -> bool:
+def add_employee(name: str, daily_rate: float, gender: str = None) -> bool:
     db = SessionLocal()
     try:
         employee = db.query(Employee).filter(Employee.name == name).first()
         if employee:
             employee.daily_rate = float(daily_rate)
+            if gender is not None:
+                employee.gender = gender
         else:
-            db.add(Employee(name=name, daily_rate=float(daily_rate)))
+            db.add(Employee(name=name, daily_rate=float(daily_rate), gender=gender))
         
         # Sync legacy attendance records
         records = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == name).all()
         for rec in records:
             rec.daily_rate = float(daily_rate)
             rec.salary = (rec.hours / 8.0) * float(daily_rate)
+            if gender is not None:
+                rec.gender = gender
             
         db.commit()
         return True
@@ -188,9 +198,56 @@ def get_all_employees() -> dict:
     db = SessionLocal()
     try:
         employees = db.query(Employee).all()
-        return {e.name: e.daily_rate for e in employees}
+        return {e.name: {'rate': e.daily_rate, 'gender': e.gender or ""} for e in employees}
     finally:
         db.close()
+
+def detect_gender(token: str) -> str:
+    if not token:
+        return ""
+    t = token.strip().lower()
+    if t in ["ប", "ប្រុស", "m", "male"]:
+        return "ប"
+    if t in ["ស", "ស្រី", "f", "female"]:
+        return "ស"
+    return ""
+
+def parse_note_details(note: str):
+    import re
+    if not note:
+        return 0.0, 0.0, ""
+    
+    # Extract borrow amount
+    borrow_amount = 0.0
+    borrow_match = re.search(r'(?:ខ្ចី|borrow|br|loan)\s*[:៖\s]?\s*(\d+(?:,\d+)?)(?:\s*៛|\s*\$)?', note, re.IGNORECASE)
+    if borrow_match:
+        val_str = borrow_match.group(1).replace(',', '')
+        try:
+            borrow_amount = float(val_str)
+        except ValueError:
+            pass
+
+    # Extract deduction amount
+    deduction_amount = 0.0
+    deduct_match = re.search(r'(?:កាត់|deduct|ded)\s*[:៖\s]?\s*(\d+(?:,\d+)?)(?:\s*៛|\s*\$)?', note, re.IGNORECASE)
+    if deduct_match:
+        val_str = deduct_match.group(1).replace(',', '')
+        try:
+            deduction_amount = float(val_str)
+        except ValueError:
+            pass
+
+    # Clean note string by removing the matched segments
+    cleaned_note = note
+    if borrow_match:
+        cleaned_note = cleaned_note.replace(borrow_match.group(0), "")
+    if deduct_match:
+        cleaned_note = cleaned_note.replace(deduct_match.group(0), "")
+    
+    cleaned_note = re.sub(r'^\s*[,，;\.\s\-\/៖:]+', '', cleaned_note)
+    cleaned_note = re.sub(r'[,，;\.\s\-\/៖:]+$', '', cleaned_note).strip()
+    
+    return borrow_amount, deduction_amount, cleaned_note
 
 def extract_report_day(header: str) -> str:
     # Look for date pattern like DD.MM.YY or D.M.YY (e.g. 16.06.26 or 1.06.26)
@@ -206,8 +263,18 @@ def save_attendance_report(date_str: str, day_header: str, workers_list: list) -
         # Check if a report for the same day already exists and delete it
         new_day = extract_report_day(day_header)
         existing_reports = db.query(Report).all()
+        
+        # Keep track of existing borrow/deduct notes to carry over
+        existing_borrows = {}
         for rep in existing_reports:
             if extract_report_day(rep.header) == new_day:
+                old_records = db.query(AttendanceRecord).filter(AttendanceRecord.report_id == rep.id).all()
+                for r in old_records:
+                    if r.note:
+                        borrow_val, deduct_val, _ = parse_note_details(r.note)
+                        if borrow_val > 0 or deduct_val > 0:
+                            existing_borrows[r.employee_name] = (borrow_val, deduct_val)
+                
                 db.query(AttendanceRecord).filter(AttendanceRecord.report_id == rep.id).delete()
                 db.delete(rep)
         db.commit()
@@ -224,9 +291,29 @@ def save_attendance_report(date_str: str, day_header: str, workers_list: list) -
             hours = w['hours']
             note = w['note']
             
-            # Resolve daily rate
+            # Clean and parse incoming note
+            incoming_b, incoming_d, cleaned_note = parse_note_details(note)
+            
+            # Carry over database values if incoming values are not specified (both 0)
+            b_val = incoming_b
+            d_val = incoming_d
+            if b_val == 0 and d_val == 0 and name in existing_borrows:
+                b_val, d_val = existing_borrows[name]
+                
+            note_parts = []
+            if cleaned_note:
+                note_parts.append(cleaned_note)
+            if b_val > 0:
+                note_parts.append(f"ខ្ចី {int(b_val)}")
+            if d_val > 0:
+                note_parts.append(f"កាត់ {int(d_val)}")
+            
+            note = ", ".join(note_parts) if note_parts else None
+            
+            # Resolve daily rate and gender
             employee = db.query(Employee).filter(Employee.name == name).first()
             rate = employee.daily_rate if employee else 0.0
+            gender = employee.gender if employee else None
             
             mult = hours / 8.0
             salary = mult * rate
@@ -238,7 +325,8 @@ def save_attendance_report(date_str: str, day_header: str, workers_list: list) -
                 hours=hours,
                 daily_rate=rate,
                 salary=salary,
-                note=note
+                note=note,
+                gender=gender
             )
             db.add(record)
             
@@ -329,10 +417,82 @@ def get_reports_by_dates(start_date_str: str = None, end_date_str: str = None) -
 
         # Sort by date ascending
         def sort_key(item):
+            from datetime import date
             d = parse_date(extract_report_day(item['report'].header))
             return d if d else date.min
 
         matched.sort(key=sort_key)
         return matched
+    finally:
+        db.close()
+
+def record_borrow(employee_name: str, borrow_amount: float, deduction_amount: float) -> tuple[bool, str, str]:
+    """
+    Records a borrow for an employee.
+    Finds today's report (or fallback to the most recent report).
+    Clears any prior borrow/deduct annotations and adds the new ones.
+    Returns (success, status_message, report_date).
+    """
+    db = SessionLocal()
+    try:
+        # Check if employee is registered in system (case-insensitive fallback)
+        employee = db.query(Employee).filter(Employee.name == employee_name).first()
+        if not employee:
+            employee = db.query(Employee).filter(Employee.name.ilike(employee_name.strip())).first()
+            
+        if not employee:
+            return False, f"Employee '<b>{employee_name}</b>' is not registered. Please register them first using <code>/addemployee</code>.", ""
+            
+        # Update name to correct registered case/spelling
+        employee_name = employee.name
+
+        # Try to find today's report
+        from datetime import timezone, timedelta, datetime
+        tz_kh = timezone(timedelta(hours=7))
+        today_str = datetime.now(tz_kh).strftime("%d-%b-%Y")
+
+        report = db.query(Report).filter(Report.date == today_str).order_by(Report.id.desc()).first()
+        if not report:
+            # Fallback to the most recent report in the system
+            report = db.query(Report).order_by(Report.id.desc()).first()
+
+        if not report:
+            return False, "⚠️ No reports found in the system. Please submit an attendance report first.", ""
+
+        # Find employee's attendance record in this report
+        record = db.query(AttendanceRecord).filter(
+            AttendanceRecord.report_id == report.id,
+            AttendanceRecord.employee_name == employee_name
+        ).first()
+        if not record:
+            record = db.query(AttendanceRecord).filter(
+                AttendanceRecord.report_id == report.id,
+                AttendanceRecord.employee_name.ilike(employee_name.strip())
+            ).first()
+
+        if not record:
+            report_day = extract_report_day(report.header)
+            return False, f"⚠️ Employee '<b>{employee_name}</b>' is not in the attendance list for the report on date '<b>{report_day}</b>'.", ""
+
+        # Clean old borrow/deduct entries from the note
+        _, _, cleaned_note = parse_note_details(record.note)
+
+        # Build new note
+        note_parts = []
+        if cleaned_note:
+            note_parts.append(cleaned_note)
+        if borrow_amount > 0:
+            note_parts.append(f"ខ្ចី {int(borrow_amount)}")
+        if deduction_amount > 0:
+            note_parts.append(f"កាត់ {int(deduction_amount)}")
+
+        record.note = ", ".join(note_parts) if note_parts else None
+        db.commit()
+
+        report_day = extract_report_day(report.header)
+        return True, employee_name, report_day
+    except Exception as e:
+        db.rollback()
+        return False, f"⚠️ Database error: {str(e)}", ""
     finally:
         db.close()

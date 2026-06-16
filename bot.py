@@ -26,7 +26,10 @@ from database import (
     parse_date,
     get_exchange_rate,
     set_exchange_rate,
-    restart_attendance_count
+    restart_attendance_count,
+    record_borrow,
+    parse_note_details,
+    detect_gender
 )
 from parser import parse_report_text_by_days
 
@@ -65,12 +68,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "📖 <b>របៀបប្រើប្រាស់ / How to Use:</b>\n\n"
         "👥 <b>ការគ្រប់គ្រងឈ្មោះបុគ្គលិក / Employee Management:</b>\n"
-        "• /addemployee &lt;ឈ្មោះ&gt; &lt;តម្លៃថ្ងៃ&gt; - ចុះឈ្មោះ ឬកែសម្រួលតម្លៃថ្ងៃបុគ្គលិក\n"
-        "  (ឧទា. <code>/addemployee ប៉ែន ទិត្យ 80000</code>)\n"
+        "• /addemployee &lt;ឈ្មោះ&gt; [ភេទ] &lt;តម្លៃថ្ងៃ&gt; - ចុះឈ្មោះ ឬកែសម្រួលព័ត៌មានបុគ្គលិក (ភេទ: ប ឬ ស)\n"
+        "  (ឧទា. <code>/addemployee ប៉ែន ទិត្យ ប 80000</code>)\n"
         "• /addemployees - ចុះឈ្មោះបុគ្គលិកច្រើននាក់ក្នុងពេលតែមួយ (បំបែកដោយចុះបន្ទាត់)\n"
         "  (ឧទា. <code>/addemployees\n"
-        "  ប៉ែន ទិត្យ 80000\n"
-        "  អៀម អេន 64000</code>)\n"
+        "  ប៉ែន ទិត្យ ប 80000\n"
+        "  អៀម អេន ស 64000</code>)\n"
         "• /updateemployee &lt;ឈ្មោះចាស់&gt; -&gt; &lt;ឈ្មោះថ្មី&gt; - កែប្រែឈ្មោះបុគ្គលិក\n"
         "  (ឧទា. <code>/updateemployee ប៉ែន ទិត្យ -&gt; ប៉ែន ទិត្យថ្មី</code>)\n"
         "• /deleteemployee &lt;ឈ្មោះ&gt; - លុបឈ្មោះបុគ្គលិកចេញពីប្រព័ន្ធ\n"
@@ -82,7 +85,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /employees - បង្ហាញបញ្ជីឈ្មោះបុគ្គលិក និងតម្លៃថ្ងៃ\n"
         "• /setexchange &lt;អត្រា&gt; - កំណត់អត្រាប្តូរប្រាក់ (រៀល/USD)\n"
         "  (ឧទា. <code>/setexchange 4100</code>)\n"
-        "• /restartcount - កំណត់ការរាប់សារជាថ្មី (លុបវត្តមាន និងរបាយការណ៍ទាំងអស់) / Restart attendance count (delete all attendance records and reports)\n\n"
+        "• /restartcount - កំណត់ការរាប់សារជាថ្មី (លុបវត្តមាន និងរបាយការណ៍ទាំងអស់) / Restart attendance count (delete all attendance records and reports)\n"
+        "• /borrow &lt;ឈ្មោះ&gt; &lt;ចំនួនលុយ&gt; - កត់ត្រាការខ្ចីលុយប្រចាំថ្ងៃ និងគណនាប្រាក់កាត់ដោយស្វ័យប្រវត្តិ / Record employee borrow amount\n"
+        "  (ឧទា. <code>/borrow ប៉ែន ទិត្យ 250000</code>)\n\n"
         "📥 <b>ទាញយករបាយការណ៍ / Download Reports:</b>\n"
         "• /report_pdf [ថ្ងៃចាប់ផ្ដើម] [ថ្ងៃបញ្ចប់] - ទាញយករបាយការណ៍ជា PDF\n"
         "  (ឧទា. <code>/report_pdf 11.06.26 16.06.26</code> ឬ <code>/report_pdf 16.06.26</code> ឬ <code>/report_pdf</code> សម្រាប់ទាញយកទាញៀសង)\n"
@@ -115,8 +120,8 @@ async def addemployee_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     args = context.args
     if len(args) < 2:
         await update.message.reply_html(
-            "⚠️ Usage: <code>/addemployee &lt;name&gt; &lt;daily_rate&gt;</code>\n"
-            "Example: <code>/addemployee ប៉ែន ទិត្យ 80000</code>"
+            "⚠️ Usage: <code>/addemployee &lt;name&gt; [gender] &lt;daily_rate&gt;</code>\n"
+            "Example: <code>/addemployee ប៉ែន ទិត្យ ប 80000</code>"
         )
         return
 
@@ -126,10 +131,24 @@ async def addemployee_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_html("⚠️ Error: daily_rate must be a number.")
         return
 
-    name = " ".join(args[:-1]).strip()
-    add_employee(name, daily_rate)
+    gender = ""
+    name_args = args[:-1]
+    if len(args) >= 3:
+        potential_gender = args[-2].strip()
+        normalized = detect_gender(potential_gender)
+        if normalized:
+            gender = normalized
+            name_args = args[:-2]
+
+    name = " ".join(name_args).strip()
+    if not name:
+        await update.message.reply_html("⚠️ Error: Employee name cannot be empty.")
+        return
+
+    add_employee(name, daily_rate, gender)
+    gender_part = f" ({gender})" if gender else ""
     await update.message.reply_html(
-        f"✅ Employee <b>{name}</b> added/updated with daily rate <b>{daily_rate:,.0f}៛/day</b>."
+        f"✅ Employee <b>{name}</b>{gender_part} added/updated with daily rate <b>{daily_rate:,.0f}៛/day</b>."
     )
 
 async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -143,8 +162,8 @@ async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_html(
             "⚠️ Usage:\n"
             "<code>/addemployees\n"
-            "ប៉ែន ទិត្យ 80000\n"
-            "អៀម អេន 64000</code>"
+            "ប៉ែន ទិត្យ ប 80000\n"
+            "អៀម អេន ស 64000</code>"
         )
         return
 
@@ -164,9 +183,23 @@ async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
         try:
             rate = float(parts[-1])
-            name = " ".join(parts[:-1]).strip()
-            add_employee(name, rate)
-            success_list.append(f"• <b>{name}</b>: {rate:,.0f}៛/day")
+            gender = ""
+            name_parts = parts[:-1]
+            if len(parts) >= 3:
+                potential_gender = parts[-2].strip()
+                normalized = detect_gender(potential_gender)
+                if normalized:
+                    gender = normalized
+                    name_parts = parts[:-2]
+                    
+            name = " ".join(name_parts).strip()
+            if not name:
+                error_list.append(f"• <code>{cleaned}</code> (Name cannot be empty)")
+                continue
+
+            add_employee(name, rate, gender)
+            gender_part = f" ({gender})" if gender else ""
+            success_list.append(f"• <b>{name}</b>{gender_part}: {rate:,.0f}៛/day")
         except ValueError:
             error_list.append(f"• <code>{cleaned}</code> (Rate must be a number)")
 
@@ -232,6 +265,61 @@ async def deleteemployee_command(update: Update, context: ContextTypes.DEFAULT_T
     else:
         await update.message.reply_html(f"⚠️ Error: Employee <b>{name}</b> not found.")
 
+async def borrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_html(
+            "⚠️ Usage: <code>/borrow &lt;employee_name&gt; &lt;amount&gt;</code>\n"
+            "Example: <code>/borrow ប៉ែន ទិត្យ 250000</code>"
+        )
+        return
+
+    amount_str = args[-1].replace(',', '')
+    try:
+        amount = float(amount_str)
+        if amount < 0:
+            raise ValueError()
+    except ValueError:
+        await update.message.reply_html("⚠️ Error: amount must be a non-negative number.")
+        return
+
+    name = " ".join(args[:-1]).strip()
+
+    # Calculate deduction based on thresholds:
+    # > 400,000៛ -> 40,000៛
+    # > 200,000៛ and <= 400,000៛ -> 20,000៛
+    # Else -> 0៛
+    if amount > 400000:
+        deduction = 40000.0
+    elif amount > 200000:
+        deduction = 20000.0
+    else:
+        deduction = 0.0
+
+    success, result_or_error, report_day = record_borrow(name, amount, deduction)
+    if success:
+        registered_name = result_or_error
+        formatted_amount = f"{int(amount):,}"
+        formatted_deduction = f"{int(deduction):,}"
+        
+        if amount == 0:
+            reply_text = (
+                "✅ <b>បានលុបការខ្ចីប្រាក់របស់បុគ្គលិក / Borrow Cleared:</b>\n\n"
+                f"👤 <b>បុគ្គលិក / Employee:</b> <b>{registered_name}</b>\n"
+                f"📅 <b>ថ្ងៃទី / Date:</b> <b>{report_day}</b>"
+            )
+        else:
+            reply_text = (
+                "✅ <b>កត់ត្រាការខ្ចីប្រាក់ជោគជ័យ / Borrow Recorded:</b>\n\n"
+                f"👤 <b>បុគ្គលិក / Employee:</b> <b>{registered_name}</b>\n"
+                f"📅 <b>ថ្ងៃទី / Date:</b> <b>{report_day}</b>\n"
+                f"💵 <b>ខ្ចីលុយ / Borrow Amount:</b> <b>{formatted_amount}៛</b>\n"
+                f"✂️ <b>ប្រាក់កាត់ / Deduction:</b> <b>{formatted_deduction}៛</b>"
+            )
+        await update.message.reply_html(reply_text)
+    else:
+        await update.message.reply_html(result_or_error)
+
 async def deleteemployees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
     command_prefix = "/deleteemployees"
@@ -287,8 +375,13 @@ async def employees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     exchange_rate = get_exchange_rate()
     text = "📋 <b>បញ្ជីឈ្មោះបុគ្គលិក និងតម្លៃថ្ងៃ / Registered Employees & Daily Rates:</b>\n"
     text += f"💵 <i>អត្រាប្តូរប្រាក់បច្ចុប្បន្ន / Current Exchange Rate: 1$ = {exchange_rate:,.0f}៛</i>\n\n"
-    for idx, (name, rate) in enumerate(employees.items(), 1):
-        text += f"{idx}. <b>{name}</b>: {rate:,.0f}៛/day\n"
+    for idx, (name, info) in enumerate(employees.items(), 1):
+        rate = info['rate']
+        gender = info['gender']
+        if gender:
+            text += f"{idx}. <b>{name}</b>: {gender} -> {rate:,.0f}៛/day\n"
+        else:
+            text += f"{idx}. <b>{name}</b>: {rate:,.0f}៛/day\n"
     await update.message.reply_html(text)
 
 def format_usd(val: float) -> str:
@@ -967,6 +1060,7 @@ async def post_init(application: Application) -> None:
             BotCommand("employees", "List all registered employees / បញ្ជីឈ្មោះបុគ្គលិក"),
             BotCommand("setexchange", "Set KHR to USD exchange rate / កំណត់អត្រាប្តូរប្រាក់"),
             BotCommand("restartcount", "Restart attendance count / កំណត់ការរាប់សារជាថ្មី"),
+            BotCommand("borrow", "Record employee borrow amount / កត់ត្រាការខ្ចីលុយ"),
             BotCommand("report_pdf", "Export report as PDF / ទាញយករបាយការណ៍ជា PDF"),
             BotCommand("report_excel", "Export report as Excel / ទាញយករបាយការណ៍ជា Excel")
         ])
@@ -1017,6 +1111,7 @@ def main():
     app.add_handler(CommandHandler("employees", employees_command))
     app.add_handler(CommandHandler("setexchange", setexchange_command))
     app.add_handler(CommandHandler("restartcount", restartcount_command))
+    app.add_handler(CommandHandler("borrow", borrow_command))
     app.add_handler(CommandHandler("report_pdf", report_pdf_command))
     app.add_handler(CommandHandler("report_excel", report_excel_command))
 
