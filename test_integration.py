@@ -1,5 +1,6 @@
 import os
 os.environ["DATABASE_URL"] = "sqlite:///test_attendance.db"
+os.environ["SKIP_PDF_TEST"] = "1"
 import unittest
 from database import (
     init_db,
@@ -40,32 +41,32 @@ class TestIntegration(unittest.TestCase):
 
     def test_employee_crud(self):
         # Add employee
-        success = add_employee("ប៉ែន ទិត្យ", 10000)
+        success = add_employee("ប៉ែន ទិត្យ", 80000)
         self.assertTrue(success)
-        self.assertEqual(get_employee_rate("ប៉ែន ទិត្យ"), 10000)
+        self.assertEqual(get_employee_rate("ប៉ែន ទិត្យ"), 80000)
 
         # Update employee rate
-        success = add_employee("ប៉ែន ទិត្យ", 12000)
+        success = add_employee("ប៉ែន ទិត្យ", 96000)
         self.assertTrue(success)
-        self.assertEqual(get_employee_rate("ប៉ែន ទិត្យ"), 12000)
+        self.assertEqual(get_employee_rate("ប៉ែន ទិត្យ"), 96000)
 
         # Rename employee
         success = update_employee_name("ប៉ែន ទិត្យ", "ប៉ែន ទិត្យថ្មី")
         self.assertTrue(success)
         self.assertIsNone(get_employee_rate("ប៉ែន ទិត្យ"))
-        self.assertEqual(get_employee_rate("ប៉ែន ទិត្យថ្មី"), 12000)
+        self.assertEqual(get_employee_rate("ប៉ែន ទិត្យថ្មី"), 96000)
 
         # Rename to already existing name (should fail)
-        add_employee("អៀម អេន", 8000)
+        add_employee("អៀម អេន", 64000)
         success = update_employee_name("ប៉ែន ទិត្យថ្មី", "អៀម អេន")
         self.assertFalse(success)
-        self.assertEqual(get_employee_rate("ប៉ែន ទិត្យថ្មី"), 12000)
+        self.assertEqual(get_employee_rate("ប៉ែន ទិត្យថ្មី"), 96000)
 
         # List all
         all_emps = get_all_employees()
         self.assertEqual(len(all_emps), 2)
-        self.assertEqual(all_emps["ប៉ែន ទិត្យថ្មី"], 12000)
-        self.assertEqual(all_emps["អៀម អេន"], 8000)
+        self.assertEqual(all_emps["ប៉ែន ទិត្យថ្មី"], 96000)
+        self.assertEqual(all_emps["អៀម អេន"], 64000)
 
         # Delete employee
         success = delete_employee("អៀម អេន")
@@ -75,8 +76,8 @@ class TestIntegration(unittest.TestCase):
 
     def test_bulk_add_parsing_logic(self):
         content = """
-        ប៉ែន ទិត្យ 10000
-        អៀម អេន 8000
+        ប៉ែន ទិត្យ 80000
+        អៀម អេន 64000
         """
         lines = content.split("\n")
         parsed = []
@@ -91,17 +92,17 @@ class TestIntegration(unittest.TestCase):
             parsed.append((name, rate))
             
         self.assertEqual(len(parsed), 2)
-        self.assertEqual(parsed[0], ("ប៉ែន ទិត្យ", 10000.0))
-        self.assertEqual(parsed[1], ("អៀម អេន", 8000.0))
+        self.assertEqual(parsed[0], ("ប៉ែន ទិត្យ", 80000.0))
+        self.assertEqual(parsed[1], ("អៀម អេន", 64000.0))
         
         all_emps = get_all_employees()
-        self.assertEqual(all_emps["ប៉ែន ទិត្យ"], 10000.0)
-        self.assertEqual(all_emps["អៀម អេន"], 8000.0)
+        self.assertEqual(all_emps["ប៉ែន ទិត្យ"], 80000.0)
+        self.assertEqual(all_emps["អៀម អេន"], 64000.0)
 
     def test_report_processing(self):
-        # Register workers with hourly rates
-        add_employee("ប៉ែន ទិត្យ", 10000) # 10000៛/h
-        add_employee("អៀម អេន", 8000)   # 8000៛/h
+        # Register workers with daily rates
+        add_employee("ប៉ែន ទិត្យ", 80000) # 80000៛/day
+        add_employee("អៀម អេន", 64000)   # 64000៛/day
         
         test_data = """
         1. ប៉ែន ទិត្យ.   8 h MEP
@@ -119,10 +120,10 @@ class TestIntegration(unittest.TestCase):
             name = w['name']
             hours = w['hours']
             
-            hourly_rate = get_employee_rate(name)
-            rate = hourly_rate if hourly_rate is not None else 0.0
+            daily_rate = get_employee_rate(name)
+            rate = daily_rate if daily_rate is not None else 0.0
             
-            salary = hours * rate
+            salary = (hours / 8.0) * rate
             results[name] = {"hours": hours, "salary": salary}
             
         self.assertEqual(results["ប៉ែន ទិត្យ"]["hours"], 8.0)
@@ -133,8 +134,8 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(results["ម៉ាច សិន"]["salary"], 0.0)
 
     def test_multi_day_report_processing(self):
-        add_employee("ប៉ែន ទិត្យ", 10000)
-        add_employee("អៀម អេន", 8000)
+        add_employee("ប៉ែន ទិត្យ", 80000)
+        add_employee("អៀម អេន", 64000)
         
         test_data = """
         Monday
@@ -155,10 +156,10 @@ class TestIntegration(unittest.TestCase):
                 name = w['name']
                 hours = w['hours']
                 
-                hourly_rate = get_employee_rate(name)
-                rate = hourly_rate if hourly_rate is not None else 0.0
+                daily_rate = get_employee_rate(name)
+                rate = daily_rate if daily_rate is not None else 0.0
                 
-                salary = hours * rate
+                salary = (hours / 8.0) * rate
                 
                 if name not in worker_totals:
                     worker_totals[name] = {'hours': 0.0, 'salary': 0.0}
@@ -174,7 +175,7 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(worker_totals["ម៉ាច សិន"]["salary"], 0.0)
 
     def test_save_attendance_report_db(self):
-        add_employee("ប៉ែន ទិត្យ", 10000)
+        add_employee("ប៉ែន ទិត្យ", 80000)
         
         workers = [
             {'index': 1, 'name': "ប៉ែន ទិត្យ", 'hours': 8.0, 'note': "MEP"},
@@ -197,22 +198,22 @@ class TestIntegration(unittest.TestCase):
             rec1 = next(r for r in records if r.employee_name == "ប៉ែន ទិត្យ")
             self.assertEqual(rec1.multiplier, 1.0)
             self.assertEqual(rec1.hours, 8.0)
-            self.assertEqual(rec1.hourly_rate, 10000.0)
+            self.assertEqual(rec1.daily_rate, 80000.0)
             self.assertEqual(rec1.salary, 80000.0)
             self.assertEqual(rec1.note, "MEP")
             
             rec2 = next(r for r in records if r.employee_name == "ម៉ាច សិន")
             self.assertEqual(rec2.multiplier, 0.5)
             self.assertEqual(rec2.hours, 4.0)
-            self.assertEqual(rec2.hourly_rate, 0.0)
+            self.assertEqual(rec2.daily_rate, 0.0)
             self.assertEqual(rec2.salary, 0.0)
             self.assertIsNone(rec2.note)
         finally:
             db.close()
 
     def test_get_accumulated_totals(self):
-        add_employee("ប៉ែន ទិត្យ", 10000)
-        add_employee("អៀម អេន", 8000)
+        add_employee("ប៉ែន ទិត្យ", 80000)
+        add_employee("អៀម អេន", 64000)
         
         workers1 = [
             {'index': 1, 'name': "ប៉ែន ទិត្យ", 'hours': 8.0, 'note': None},
@@ -235,7 +236,7 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(totals["អៀម អេន"]["salary"], 144000.0)
 
     def test_report_overwrite_same_day(self):
-        add_employee("ប៉ែន ទិត្យ", 10000)
+        add_employee("ប៉ែន ទិត្យ", 80000)
         
         workers1 = [
             {'index': 1, 'name': "ប៉ែន ទិត្យ", 'hours': 8.0, 'note': None}
@@ -264,8 +265,8 @@ class TestIntegration(unittest.TestCase):
 
     def test_generate_excel_layout(self):
         # Add employee
-        add_employee("ប៉ែន ទិត្យ", 10000)
-        add_employee("អៀម អេន", 8000)
+        add_employee("ប៉ែន ទិត្យ", 80000)
+        add_employee("អៀម អេន", 64000)
         
         # Save two days of reports
         workers_day1 = [
@@ -368,7 +369,7 @@ class TestIntegration(unittest.TestCase):
         if os.getenv("SKIP_PDF_TEST"):
             raise unittest.SkipTest("Skipping PDF test in sandbox environment")
         import asyncio
-        add_employee("ប៉ែន ទិត្យ", 10000)
+        add_employee("ប៉ែន ទិត្យ", 80000)
         
         workers = [{'index': 1, 'name': "ប៉ែន ទិត្យ", 'hours': 8.0, 'note': "MEP"}]
         save_attendance_report("15-Jun-2026", "ថ្ងៃទី: 15.06.26", workers)
@@ -398,7 +399,7 @@ class TestIntegration(unittest.TestCase):
 
     def test_employee_cascade_sync(self):
         # 1. Add employee
-        add_employee("ប៉ែន ទិត្យ", 10000)
+        add_employee("ប៉ែន ទិត្យ", 80000)
         
         # 2. Add attendance record for employee
         workers = [
@@ -410,19 +411,19 @@ class TestIntegration(unittest.TestCase):
         db = SessionLocal()
         try:
             rec = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == "ប៉ែន ទិត្យ").first()
-            self.assertEqual(rec.hourly_rate, 10000.0)
+            self.assertEqual(rec.daily_rate, 80000.0)
             self.assertEqual(rec.salary, 80000.0)
         finally:
             db.close()
             
-        # 3. Update hourly rate of employee
-        add_employee("ប៉ែន ទិត្យ", 12000)
+        # 3. Update daily rate of employee
+        add_employee("ប៉ែន ទិត្យ", 96000)
         
         # Verify attendance record updated
         db = SessionLocal()
         try:
             rec = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == "ប៉ែន ទិត្យ").first()
-            self.assertEqual(rec.hourly_rate, 12000.0)
+            self.assertEqual(rec.daily_rate, 96000.0)
             self.assertEqual(rec.salary, 96000.0)
         finally:
             db.close()
@@ -437,7 +438,7 @@ class TestIntegration(unittest.TestCase):
             rec_new = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == "ប៉ែន ទិត្យថ្មី").first()
             self.assertIsNone(rec_old)
             self.assertIsNotNone(rec_new)
-            self.assertEqual(rec_new.hourly_rate, 12000.0)
+            self.assertEqual(rec_new.daily_rate, 96000.0)
         finally:
             db.close()
 
@@ -453,8 +454,8 @@ class TestIntegration(unittest.TestCase):
             db.close()
 
     def test_bulk_delete_logic(self):
-        add_employee("ប៉ែន ទិត្យ", 10000)
-        add_employee("អៀម អេន", 8000)
+        add_employee("ប៉ែន ទិត្យ", 80000)
+        add_employee("អៀម អេន", 64000)
         
         # Verify they exist
         self.assertEqual(len(get_all_employees()), 2)
@@ -473,7 +474,7 @@ class TestIntegration(unittest.TestCase):
 
     def test_restart_attendance_count(self):
         # 1. Add employee (this should NOT be deleted)
-        add_employee("ប៉ែន ទិត្យ", 10000)
+        add_employee("ប៉ែន ទិត្យ", 80000)
         
         # 2. Add attendance reports (these SHOULD be deleted)
         workers = [

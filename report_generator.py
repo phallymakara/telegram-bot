@@ -52,11 +52,11 @@ def aggregate_summary_data(reports_data: list) -> dict:
         for record in data['records']:
             name = record.employee_name
             if name not in summary:
-                summary[name] = {'hours': 0.0, 'salary': 0.0, 'rate': record.hourly_rate}
+                summary[name] = {'hours': 0.0, 'salary': 0.0, 'rate': record.daily_rate}
             summary[name]['hours'] += record.hours
             summary[name]['salary'] += record.salary
-            if record.hourly_rate > 0:
-                summary[name]['rate'] = record.hourly_rate
+            if record.daily_rate > 0:
+                summary[name]['rate'] = record.daily_rate
     return summary
 
 
@@ -89,7 +89,7 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
     headers_summary = [
         "ឈ្មោះបុគ្គលិក",
         "ម៉ោងការងារសរុប",
-        "តម្លៃម៉ោង",
+        "តម្លៃថ្ងៃ",
         "ប្រាក់ឈ្នួលសរុប (USD)",
         "ប្រាក់ឈ្នួលសរុប (KHR)"
     ]
@@ -104,7 +104,7 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
     for name, stats in sorted(summary_data.items()):
         ws_summary.cell(row=row_idx, column=1, value=name)
         ws_summary.cell(row=row_idx, column=2, value=stats['hours']).number_format = '#,##0.0'
-        ws_summary.cell(row=row_idx, column=3, value=stats['rate']).number_format = '#,##0" ៛/ម៉ោង"'
+        ws_summary.cell(row=row_idx, column=3, value=stats['rate']).number_format = '#,##0" ៛/ថ្ងៃ"'
         
         # USD Column (Column 4): Formula = E{row_idx} / exchange_rate
         usd_formula = f"=E{row_idx}/{exchange_rate}"
@@ -325,7 +325,7 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
                 <td>{i}</td>
                 <td class="name">{name}</td>
                 <td class="num">{stats['hours']:.1f} ម៉ោង</td>
-                <td class="num">{stats['rate']:,.0f} ៛/ម៉ោង</td>
+                <td class="num">{stats['rate']:,.0f} ៛/ថ្ងៃ</td>
                 <td class="num">${stats['salary'] / exchange_rate:.2f}</td>
                 <td class="num">{int(round(stats['salary'])):,} ៛</td>
             </tr>"""
@@ -346,7 +346,7 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
                     <td class="center">{i}</td>
                     <td class="name">{rec.employee_name}</td>
                     <td class="num">{rec.hours:.1f} ម៉ោង</td>
-                    <td class="num">{rec.hourly_rate:,.0f} ៛/ម៉ោង</td>
+                    <td class="num">{rec.daily_rate:,.0f} ៛/ថ្ងៃ</td>
                     <td class="num">${rec.salary / exchange_rate:.2f}</td>
                     <td class="num">{int(round(rec.salary)):,} ៛</td>
                     <td>{rec.note or ''}</td>
@@ -361,7 +361,7 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
                             <th style="width:30px">ល.រ</th>
                             <th>ឈ្មោះបុគ្គលិក</th>
                             <th class="num">ម៉ោងសរុប</th>
-                            <th class="num">តម្លៃម៉ោង</th>
+                            <th class="num">តម្លៃថ្ងៃ</th>
                             <th class="num">ប្រាក់ (USD)</th>
                             <th class="num">ប្រាក់ (រៀល)</th>
                             <th>សម្គាល់</th>
@@ -487,7 +487,7 @@ tfoot.grand-total td {{
             <th style="width:30px">ល.រ</th>
             <th>ឈ្មោះបុគ្គលិក</th>
             <th class="num">ម៉ោងសរុប</th>
-            <th class="num">តម្លៃម៉ោង</th>
+            <th class="num">តម្លៃថ្ងៃ</th>
             <th class="num">ប្រាក់សរុប (USD)</th>
             <th class="num">ប្រាក់សរុប (រៀល)</th>
         </tr>

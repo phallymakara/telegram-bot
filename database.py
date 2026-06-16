@@ -11,7 +11,7 @@ Base = declarative_base()
 class Employee(Base):
     __tablename__ = 'employees'
     name = Column(String, primary_key=True)
-    hourly_rate = Column(Float, nullable=False)
+    daily_rate = Column(Float, nullable=False)
 
 class Setting(Base):
     __tablename__ = 'settings'
@@ -32,7 +32,7 @@ class AttendanceRecord(Base):
     employee_name = Column(String, nullable=False)
     multiplier = Column(Float, nullable=False)
     hours = Column(Float, nullable=False)
-    hourly_rate = Column(Float, nullable=False)
+    daily_rate = Column(Float, nullable=False)
     salary = Column(Float, nullable=False)
     note = Column(String, nullable=True)
 
@@ -48,6 +48,18 @@ def init_db():
     if 'worker_rates' in existing_tables:
         with engine.begin() as conn:
             conn.execute(text("DROP TABLE IF EXISTS worker_rates"))
+            
+    # Auto-migration: rename columns from hourly_rate to daily_rate if they exist
+    with engine.begin() as conn:
+        if 'employees' in existing_tables:
+            columns = [c['name'] for c in inspector.get_columns('employees')]
+            if 'hourly_rate' in columns and 'daily_rate' not in columns:
+                conn.execute(text("ALTER TABLE employees RENAME COLUMN hourly_rate TO daily_rate"))
+        if 'attendance' in existing_tables:
+            columns = [c['name'] for c in inspector.get_columns('attendance')]
+            if 'hourly_rate' in columns and 'daily_rate' not in columns:
+                conn.execute(text("ALTER TABLE attendance RENAME COLUMN hourly_rate TO daily_rate"))
+                
     Base.metadata.create_all(bind=engine)
 
 # Settings utilities
@@ -85,20 +97,20 @@ def set_exchange_rate(rate: float):
     set_setting('exchange_rate', str(rate))
 
 # Utility functions
-def add_employee(name: str, hourly_rate: float) -> bool:
+def add_employee(name: str, daily_rate: float) -> bool:
     db = SessionLocal()
     try:
         employee = db.query(Employee).filter(Employee.name == name).first()
         if employee:
-            employee.hourly_rate = float(hourly_rate)
+            employee.daily_rate = float(daily_rate)
         else:
-            db.add(Employee(name=name, hourly_rate=float(hourly_rate)))
+            db.add(Employee(name=name, daily_rate=float(daily_rate)))
         
         # Sync legacy attendance records
         records = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == name).all()
         for rec in records:
-            rec.hourly_rate = float(hourly_rate)
-            rec.salary = rec.hours * float(hourly_rate)
+            rec.daily_rate = float(daily_rate)
+            rec.salary = (rec.hours / 8.0) * float(daily_rate)
             
         db.commit()
         return True
@@ -168,7 +180,7 @@ def get_employee_rate(name: str) -> float:
     db = SessionLocal()
     try:
         employee = db.query(Employee).filter(Employee.name == name).first()
-        return employee.hourly_rate if employee else None
+        return employee.daily_rate if employee else None
     finally:
         db.close()
 
@@ -176,7 +188,7 @@ def get_all_employees() -> dict:
     db = SessionLocal()
     try:
         employees = db.query(Employee).all()
-        return {e.name: e.hourly_rate for e in employees}
+        return {e.name: e.daily_rate for e in employees}
     finally:
         db.close()
 
@@ -212,19 +224,19 @@ def save_attendance_report(date_str: str, day_header: str, workers_list: list) -
             hours = w['hours']
             note = w['note']
             
-            # Resolve hourly rate
+            # Resolve daily rate
             employee = db.query(Employee).filter(Employee.name == name).first()
-            rate = employee.hourly_rate if employee else 0.0
+            rate = employee.daily_rate if employee else 0.0
             
             mult = hours / 8.0
-            salary = hours * rate
+            salary = mult * rate
             
             record = AttendanceRecord(
                 report_id=report.id,
                 employee_name=name,
                 multiplier=mult,
                 hours=hours,
-                hourly_rate=rate,
+                daily_rate=rate,
                 salary=salary,
                 note=note
             )
@@ -241,20 +253,25 @@ def save_attendance_report(date_str: str, day_header: str, workers_list: list) -
 def get_accumulated_totals() -> dict:
     db = SessionLocal()
     try:
-        from sqlalchemy import func
-        results = db.query(
-            AttendanceRecord.employee_name,
-            func.sum(AttendanceRecord.hours).label('total_hours'),
-            func.sum(AttendanceRecord.salary).label('total_salary')
-        ).group_by(AttendanceRecord.employee_name).all()
-        
-        return {
-            row[0]: {
-                'hours': float(row[1]) if row[1] is not None else 0.0,
-                'salary': float(row[2]) if row[2] is not None else 0.0
-            }
-            for row in results
-        }
+        records = db.query(AttendanceRecord).all()
+        totals = {}
+        for rec in records:
+            name = rec.employee_name
+            if name not in totals:
+                totals[name] = {
+                    'hours': 0.0,
+                    'salary': 0.0,
+                    'ot_hours': 0.0,
+                    'ot_salary': 0.0
+                }
+            totals[name]['hours'] += rec.hours
+            totals[name]['salary'] += rec.salary
+            
+            ot_h = max(0.0, rec.hours - 8.0)
+            ot_s = ot_h * (rec.daily_rate / 8.0)
+            totals[name]['ot_hours'] += ot_h
+            totals[name]['ot_salary'] += ot_s
+        return totals
     finally:
         db.close()
 

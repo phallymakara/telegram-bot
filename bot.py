@@ -65,12 +65,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "📖 <b>របៀបប្រើប្រាស់ / How to Use:</b>\n\n"
         "👥 <b>ការគ្រប់គ្រងឈ្មោះបុគ្គលិក / Employee Management:</b>\n"
-        "• /addemployee &lt;ឈ្មោះ&gt; &lt;តម្លៃម៉ោង&gt; - ចុះឈ្មោះ ឬកែសម្រួលតម្លៃម៉ោងបុគ្គលិក\n"
-        "  (ឧទា. <code>/addemployee ប៉ែន ទិត្យ 10000</code>)\n"
+        "• /addemployee &lt;ឈ្មោះ&gt; &lt;តម្លៃថ្ងៃ&gt; - ចុះឈ្មោះ ឬកែសម្រួលតម្លៃថ្ងៃបុគ្គលិក\n"
+        "  (ឧទា. <code>/addemployee ប៉ែន ទិត្យ 80000</code>)\n"
         "• /addemployees - ចុះឈ្មោះបុគ្គលិកច្រើននាក់ក្នុងពេលតែមួយ (បំបែកដោយចុះបន្ទាត់)\n"
         "  (ឧទា. <code>/addemployees\n"
-        "  ប៉ែន ទិត្យ 10000\n"
-        "  អៀម អេន 8000</code>)\n"
+        "  ប៉ែន ទិត្យ 80000\n"
+        "  អៀម អេន 64000</code>)\n"
         "• /updateemployee &lt;ឈ្មោះចាស់&gt; -&gt; &lt;ឈ្មោះថ្មី&gt; - កែប្រែឈ្មោះបុគ្គលិក\n"
         "  (ឧទា. <code>/updateemployee ប៉ែន ទិត្យ -&gt; ប៉ែន ទិត្យថ្មី</code>)\n"
         "• /deleteemployee &lt;ឈ្មោះ&gt; - លុបឈ្មោះបុគ្គលិកចេញពីប្រព័ន្ធ\n"
@@ -79,7 +79,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "  (ឧទា. <code>/deleteemployees\n"
         "  ប៉ែន ទិត្យ\n"
         "  អៀម អេន</code>)\n"
-        "• /employees - បង្ហាញបញ្ជីឈ្មោះបុគ្គលិក និងតម្លៃម៉ោង\n"
+        "• /employees - បង្ហាញបញ្ជីឈ្មោះបុគ្គលិក និងតម្លៃថ្ងៃ\n"
         "• /setexchange &lt;អត្រា&gt; - កំណត់អត្រាប្តូរប្រាក់ (រៀល/USD)\n"
         "  (ឧទា. <code>/setexchange 4100</code>)\n"
         "• /restartcount - កំណត់ការរាប់សារជាថ្មី (លុបវត្តមាន និងរបាយការណ៍ទាំងអស់) / Restart attendance count (delete all attendance records and reports)\n\n"
@@ -106,8 +106,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "💡 <b>ចំណាំ / Rules:</b>\n"
         "• បញ្ជីនីមួយៗត្រូវផ្តើមដោយលេខលំដាប់ (ឧទា. <code>1.</code>)\n"
         "• ចំនួនម៉ោងធ្វើការត្រូវដាក់នៅចុងបញ្ចប់នៃបន្ទាត់ (ឧទា. <code>8 h</code> ឬ <code>8.9 h</code> ឬ <code>8h</code>)\n"
-        "• តម្លៃម៉ោងរបស់បុគ្គលិកដែលមិនទាន់ចុះឈ្មោះគឺ 0៛ (នឹងបង្ហាញសញ្ញាព្រមាន ⚠️)\n"
-        "• ប្រាក់ឈ្នួល = ម៉ោងធ្វើការសរុប × តម្លៃម៉ោង"
+        "• តម្លៃថ្ងៃរបស់បុគ្គលិកដែលមិនទាន់ចុះឈ្មោះគឺ 0៛ (នឹងបង្ហាញសញ្ញាព្រមាន ⚠️)\n"
+        "• ប្រាក់ឈ្នួល = (ម៉ោងធ្វើការសរុប ÷ 8) × តម្លៃថ្ងៃ"
     )
     await update.message.reply_html(help_text)
 
@@ -115,21 +115,21 @@ async def addemployee_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     args = context.args
     if len(args) < 2:
         await update.message.reply_html(
-            "⚠️ Usage: <code>/addemployee &lt;name&gt; &lt;hourly_rate&gt;</code>\n"
-            "Example: <code>/addemployee ប៉ែន ទិត្យ 10000</code>"
+            "⚠️ Usage: <code>/addemployee &lt;name&gt; &lt;daily_rate&gt;</code>\n"
+            "Example: <code>/addemployee ប៉ែន ទិត្យ 80000</code>"
         )
         return
 
     try:
-        hourly_rate = float(args[-1])
+        daily_rate = float(args[-1])
     except ValueError:
-        await update.message.reply_html("⚠️ Error: hourly_rate must be a number.")
+        await update.message.reply_html("⚠️ Error: daily_rate must be a number.")
         return
 
     name = " ".join(args[:-1]).strip()
-    add_employee(name, hourly_rate)
+    add_employee(name, daily_rate)
     await update.message.reply_html(
-        f"✅ Employee <b>{name}</b> added/updated with hourly rate <b>{hourly_rate:,.0f}៛/h</b>."
+        f"✅ Employee <b>{name}</b> added/updated with daily rate <b>{daily_rate:,.0f}៛/day</b>."
     )
 
 async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -143,8 +143,8 @@ async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_html(
             "⚠️ Usage:\n"
             "<code>/addemployees\n"
-            "ប៉ែន ទិត្យ 10000\n"
-            "អៀម អេន 8000</code>"
+            "ប៉ែន ទិត្យ 80000\n"
+            "អៀម អេន 64000</code>"
         )
         return
 
@@ -166,7 +166,7 @@ async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYP
             rate = float(parts[-1])
             name = " ".join(parts[:-1]).strip()
             add_employee(name, rate)
-            success_list.append(f"• <b>{name}</b>: {rate:,.0f}៛/h")
+            success_list.append(f"• <b>{name}</b>: {rate:,.0f}៛/day")
         except ValueError:
             error_list.append(f"• <code>{cleaned}</code> (Rate must be a number)")
 
@@ -280,16 +280,53 @@ async def employees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     employees = get_all_employees()
     if not employees:
         await update.message.reply_html(
-            "ℹ️ No employees registered yet. Register employees using <code>/addemployee &lt;name&gt; &lt;hourly_rate&gt;</code>."
+            "ℹ️ No employees registered yet. Register employees using <code>/addemployee &lt;name&gt; &lt;daily_rate&gt;</code>."
         )
         return
 
     exchange_rate = get_exchange_rate()
-    text = "📋 <b>បញ្ជីឈ្មោះបុគ្គលិក និងតម្លៃម៉ោង / Registered Employees & Hourly Rates:</b>\n"
+    text = "📋 <b>បញ្ជីឈ្មោះបុគ្គលិក និងតម្លៃថ្ងៃ / Registered Employees & Daily Rates:</b>\n"
     text += f"💵 <i>អត្រាប្តូរប្រាក់បច្ចុប្បន្ន / Current Exchange Rate: 1$ = {exchange_rate:,.0f}៛</i>\n\n"
     for idx, (name, rate) in enumerate(employees.items(), 1):
-        text += f"{idx}. <b>{name}</b>: {rate:,.0f}៛/h\n"
+        text += f"{idx}. <b>{name}</b>: {rate:,.0f}៛/day\n"
     await update.message.reply_html(text)
+
+def format_usd(val: float) -> str:
+    if val == int(val):
+        return f"{int(val)}$"
+    s = f"{val:.2f}"
+    if s.endswith('0'):
+        s = s[:-1]
+    return f"{s}$"
+
+def format_riel(val: float) -> str:
+    riel = int(round(val))
+    if riel >= 1000 and riel % 1000 == 0:
+        return f"{riel // 1000}k"
+    return f"{riel}"
+
+def get_num_emoji(idx: int) -> str:
+    emojis = {
+        1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣",
+        6: "6️⃣", 7: "7️⃣", 8: "8️⃣", 9: "9️⃣", 10: "🔟"
+    }
+    if idx in emojis:
+        return emojis[idx]
+    res = ""
+    for char in str(idx):
+        res += char + "️⃣"
+    return res
+
+def parse_header_date_time(header: str):
+    import re
+    # Matches "ថ្ងៃទី: 20.06.26 (07:00 AM - 05:00 PM)" or similar
+    # Khmer text "ថ្ងៃទី" or "ងៃទី" followed by optional colon and spaces
+    match = re.search(r'(?:ថ្ងៃទី|ងៃទី|កាលបរិច្ឆេទ)?\s*[:៖]?\s*([\d\.\-\/]+)\s*(?:\((.*?)\))?', header, re.IGNORECASE)
+    if match:
+        date_part = match.group(1).strip()
+        time_part = match.group(2).strip() if match.group(2) else None
+        return date_part, time_part
+    return header.strip(), None
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
@@ -324,23 +361,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db_status = ""
         try:
             report_id = save_attendance_report(current_date, day_header, parsed_workers)
-            db_status = f"\n\nរក្សាទុកទិន្នន័យរួចរាល់ (Report ID: {report_id})"
+            db_status = (
+                f"✅ រក្សាទុកទិន្នន័យរួចរាល់\n"
+                f"🆔 Report ID: #{report_id}"
+            )
         except Exception as e:
             logger.error(f"Error saving report to database: {e}")
 
         # Fetch cumulative running totals from database
         running_totals = get_accumulated_totals()
 
-        for w in parsed_workers:
+        for idx, w in enumerate(parsed_workers, 1):
             name = w['name']
             hours = w['hours']
             note = w['note']
 
-            hourly_rate = get_employee_rate(name)
-            is_unregistered = hourly_rate is None
-            rate = hourly_rate if hourly_rate is not None else 0.0
+            daily_rate = get_employee_rate(name)
+            is_unregistered = daily_rate is None
+            rate = daily_rate if daily_rate is not None else 0.0
 
-            salary = hours * rate
+            salary = (hours / 8.0) * rate
 
             accum_hours = running_totals.get(name, {}).get('hours', hours)
             accum_salary = running_totals.get(name, {}).get('salary', salary)
@@ -348,48 +388,86 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             salary_usd = salary / exchange_rate
             accum_salary_usd = accum_salary / exchange_rate
 
-            # Today's details line
-            today_str = f"{w['index']}. <b>{name}</b>: <b>{hours:.1f} h</b> -> <b>{salary_usd:.2f}$ ({int(round(salary)):,}៛)</b>"
+            ot_hours = max(0.0, hours - 8.0)
+            ot_salary = ot_hours * (rate / 8.0)
+            ot_salary_usd = ot_salary / exchange_rate
+
+            accum_ot_hours = running_totals.get(name, {}).get('ot_hours', ot_hours)
+            accum_ot_salary = running_totals.get(name, {}).get('ot_salary', ot_salary)
+            accum_ot_salary_usd = accum_ot_salary / exchange_rate
+
+            # Build lines for today
+            label_suffix = ""
             if is_unregistered:
-                today_str += " <i>Unregistered</i>"
+                label_suffix += " (Unregistered)"
             if note:
-                today_str += f" ({note})"
-            details_today_lines.append(today_str)
+                label_suffix += f" ({note})"
 
-            # Total details line
-            total_str = f"{w['index']}. <b>{name}</b>: <b>{accum_hours:.1f} h</b> -> <b>{accum_salary_usd:.2f}$ ({int(round(accum_salary)):,}៛)</b>"
+            num_emoji = get_num_emoji(idx)
+            today_worker_block = (
+                f"{num_emoji} <b>{name}</b>{label_suffix}\n"
+                f"• ម៉ោងធ្វើការ : {hours:.1f}h\n"
+                f"• ម៉ោងថែម    : {ot_hours:.1f}h\n"
+                f"• ប្រាក់ថែម   : {int(round(ot_salary)):,}៛ (${ot_salary_usd:.2f})\n"
+                f"• សរុបថ្ងៃនេះ : {int(round(salary)):,}៛ (${salary_usd:.2f})"
+            )
+            details_today_lines.append(today_worker_block)
+
+            # Build lines for total
+            total_label_suffix = ""
             if is_unregistered:
-                total_str += " <i>Unregistered</i>"
-            details_total_lines.append(total_str)
+                total_label_suffix += " (Unregistered)"
 
+            total_worker_block = (
+                f"{num_emoji} <b>{name}</b>{total_label_suffix}\n"
+                f"• ម៉ោងសរុប : {accum_hours:.1f}h\n"
+                f"• ម៉ោងថែម : {accum_ot_hours:.1f}h\n"
+                f"• ប្រាក់សរុប : {int(round(accum_salary)):,}៛ (${accum_salary_usd:.2f})"
+            )
+            details_total_lines.append(total_worker_block)
+
+        # Parse header
+        date_part, time_part = parse_header_date_time(day_header)
+        report_header = "📋 <b>របាយការណ៍វត្តមាន និងប្រាក់ឈ្នួល</b>\n\n"
+        report_header += f"ថ្ងៃទី: {date_part}\n"
+        if time_part:
+            report_header += f"ម៉ោងការងារ: {time_part}\n"
+
+        separator = "━━━━━━━━━━━━━━━━━━━━"
+
+        today_section = (
+            f"\n{separator}\n"
+            f"<b>ការងារថ្ងៃនេះ</b>\n"
+            f"{separator}\n"
+            + "\n\n".join(details_today_lines) + "\n"
+        )
+
+        total_section = (
+            f"\n{separator}\n"
+            f"<b>ប្រាក់សរុប</b>\n"
+            f"{separator}\n"
+            + "\n\n".join(details_total_lines) + "\n"
+        )
+
+        # Totals for all employees in running totals database
         total_hours_day_one = sum(info['hours'] for info in running_totals.values())
         total_salary_day_one_riel = sum(info['salary'] for info in running_totals.values())
         total_salary_day_one_usd = total_salary_day_one_riel / exchange_rate
 
-        report_header = f"<b>{day_header}</b>\n"
-        
-        today_section = (
-            f"<b>ចំនួនម៉ោង និង ប្រាក់ ធ្វើការថ្ងៃនេះ</b>\n"
-            f"----------------------------------------\n"
-            + "\n".join(details_today_lines) + "\n"
-            f"----------------------------------------\n\n"
-        )
-        
-        total_section = (
-            f"<b>ចំនួនម៉ោង និង ប្រាក់សរុប</b>\n"
-            f"----------------------------------------\n"
-            + "\n".join(details_total_lines) + "\n"
-            f"----------------------------------------\n"
-        )
-        
-        report_footer = (
-            f"<b>សរុប:</b>\n"
-            f"វត្តមានសរុប : <b>{total_staff} នាក់</b>\n"
-            f"ម៉ោងការងារសរុប : <b>{total_hours_day_one:.1f} h</b>\n"
-            f"ប្រាក់ឈ្នួលសរុប : <b>{total_salary_day_one_usd:.2f}$ ({int(round(total_salary_day_one_riel)):,}៛)</b>"
+        footer_section = (
+            f"\n{separator}\n"
+            f"<b>សរុប</b>\n"
+            f"{separator}\n"
+            f"👥 វត្តមានសរុប      : {total_staff} នាក់\n"
+            f"⏱️ ម៉ោងការងារសរុប  : {total_hours_day_one:.1f}h\n"
+            f"💰 ប្រាក់ឈ្នួលសរុប : ${total_salary_day_one_usd:.2f}\n"
+            f"🇰🇭 ស្មើនឹង        : {int(round(total_salary_day_one_riel)):,}៛"
         )
 
-        full_report = report_header + today_section + total_section + report_footer + db_status
+        if db_status:
+            footer_section += f"\n\n{db_status}"
+
+        full_report = report_header + today_section + total_section + footer_section
         await update.message.reply_html(full_report)
 
     else:
@@ -420,20 +498,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 hours = w['hours']
                 note = w['note']
 
-                hourly_rate = get_employee_rate(name)
-                is_unregistered = hourly_rate is None
-                rate = hourly_rate if hourly_rate is not None else 0.0
+                daily_rate = get_employee_rate(name)
+                is_unregistered = daily_rate is None
+                rate = daily_rate if daily_rate is not None else 0.0
 
-                salary = hours * rate
+                salary = (hours / 8.0) * rate
 
                 day_hours += hours
                 day_salary += salary
+
+                ot_hours = max(0.0, hours - 8.0)
+                ot_salary = ot_hours * (rate / 8.0)
 
                 if name not in worker_totals:
                     worker_totals[name] = {
                         'days': 0.0,
                         'hours': 0.0,
                         'salary': 0.0,
+                        'ot_hours': 0.0,
+                        'ot_salary': 0.0,
                         'notes': set(),
                         'unregistered': is_unregistered,
                         'rate': rate
@@ -442,6 +525,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 worker_totals[name]['days'] += hours / default_hours_per_day
                 worker_totals[name]['hours'] += hours
                 worker_totals[name]['salary'] += salary
+                worker_totals[name]['ot_hours'] += ot_hours
+                worker_totals[name]['ot_salary'] += ot_salary
                 if note:
                     worker_totals[name]['notes'].add(note)
 
@@ -450,7 +535,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             day_salary_usd = day_salary / exchange_rate
             daily_breakdown_lines.append(
-                f"• <b>{day_header}</b>: {day_staff_count} នាក់/workers | <b>{day_hours:.1f}h</b> | <b>{day_salary_usd:.2f}$ ({int(round(day_salary)):,}៛)</b>"
+                f"• <b>{day_header}</b>: {day_staff_count} នាក់/workers | <b>{day_hours:.1f}h</b> | <b>${day_salary_usd:.2f} ({int(round(day_salary)):,}៛)</b>"
             )
 
         # Fetch cumulative running totals from database
@@ -459,27 +544,49 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         details_report_lines = []
         details_total_lines = []
         for i, (name, stats) in enumerate(worker_totals.items(), 1):
-            days_str = f"{stats['days']:.2f}" if stats['days'] % 1 != 0 else f"{int(stats['days'])}"
+            days_val = stats['days']
+            days_str = f"{days_val:.2f}" if days_val % 1 != 0 else f"{int(days_val)}"
 
             accum_hours = running_totals.get(name, {}).get('hours', 0.0)
             accum_salary = running_totals.get(name, {}).get('salary', 0.0)
+            accum_ot_hours = running_totals.get(name, {}).get('ot_hours', 0.0)
+            accum_ot_salary = running_totals.get(name, {}).get('ot_salary', 0.0)
 
             stats_salary_usd = stats['salary'] / exchange_rate
             accum_salary_usd = accum_salary / exchange_rate
+            stats_ot_salary_usd = stats['ot_salary'] / exchange_rate
+            accum_ot_salary_usd = accum_ot_salary / exchange_rate
 
-            # Today's report block details line
-            report_str = f"{i}. <b>{name}</b> ({days_str} ថ្ងៃ / days): <b>{stats['hours']:.1f} h</b> -> <b>{stats_salary_usd:.2f}$ ({int(round(stats['salary'])):,}៛)</b>"
+            label_suffix = ""
             if stats['unregistered']:
-                report_str += " <i>Unregistered</i>"
+                label_suffix += " (Unregistered)"
             if stats['notes']:
                 notes_str = ", ".join(sorted(list(stats['notes'])))
-                report_str += f" ({notes_str})"
+                label_suffix += f" ({notes_str})"
+
+            num_emoji = get_num_emoji(i)
+            # Today's report block details line
+            report_str = (
+                f"{num_emoji} <b>{name}</b>{label_suffix}\n"
+                f"• ចំនួនថ្ងៃ   : {days_str} ថ្ងៃ\n"
+                f"• ម៉ោងសរុប  : {stats['hours']:.1f}h\n"
+                f"• ម៉ោងថែម   : {stats['ot_hours']:.1f}h\n"
+                f"• ប្រាក់ថែម  : {int(round(stats['ot_salary'])):,}៛ (${stats_ot_salary_usd:.2f})\n"
+                f"• ប្រាក់សរុប : {int(round(stats['salary'])):,}៛ (${stats_salary_usd:.2f})"
+            )
             details_report_lines.append(report_str)
 
             # Total line
-            total_str = f"{i}. <b>{name}</b>: <b>{accum_hours:.1f} h</b> -> <b>{accum_salary_usd:.2f}$ ({int(round(accum_salary)):,}៛)</b>"
+            total_label_suffix = ""
             if stats['unregistered']:
-                total_str += " <i>Unregistered</i>"
+                total_label_suffix += " (Unregistered)"
+
+            total_str = (
+                f"{num_emoji} <b>{name}</b>{total_label_suffix}\n"
+                f"• ម៉ោងសរុប : {accum_hours:.1f}h\n"
+                f"• ម៉ោងថែម : {accum_ot_hours:.1f}h\n"
+                f"• ប្រាក់សរុប : {int(round(accum_salary)):,}៛ (${accum_salary_usd:.2f})"
+            )
             details_total_lines.append(total_str)
 
         total_hours_day_one = sum(info['hours'] for info in running_totals.values())
@@ -487,42 +594,54 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_salary_day_one_usd = total_salary_day_one_riel / exchange_rate
 
         report_header = (
-            f"<b>របាយការណ៍ការងារច្រើនថ្ងៃ / Multi-day Work Report</b>\n"
-            f"<b>កាលបរិច្ឆេទគណនា / Computed Date:</b> {current_date}\n\n"
-            f"<b>បំណែងចែកតាមថ្ងៃ / Daily Breakdown:</b>\n"
-            f"-----------------------------------------\n"
+            f"📋 <b>របាយការណ៍ការងារច្រើនថ្ងៃ / Multi-day Work Report</b>\n"
+            f"កាលបរិច្ឆេទគណនា: {current_date}\n"
+        )
+
+        separator = "━━━━━━━━━━━━━━━━━━━━"
+
+        breakdown_section = (
+            f"\n{separator}\n"
+            f"<b>បំណែងចែកតាមថ្ងៃ / Daily Breakdown</b>\n"
+            f"{separator}\n"
             + "\n".join(daily_breakdown_lines) + "\n"
-            f"-----------------------------------------\n\n"
         )
 
         today_section = (
+            f"\n{separator}\n"
             f"<b>ចំនួនម៉ោង និង ប្រាក់ ធ្វើការក្នុងរបាយការណ៍នេះ</b>\n"
-            f"----------------------------------------\n"
-            + "\n".join(details_report_lines) + "\n"
-            f"----------------------------------------\n\n"
+            f"{separator}\n"
+            + "\n\n".join(details_report_lines) + "\n"
         )
 
         total_section = (
+            f"\n{separator}\n"
             f"<b>ចំនួនម៉ោង និង ប្រាក់សរុប</b>\n"
-            f"----------------------------------------\n"
-            + "\n".join(details_total_lines) + "\n"
-            f"----------------------------------------\n"
+            f"{separator}\n"
+            + "\n\n".join(details_total_lines) + "\n"
         )
 
-        report_footer = (
-            f"<b>សរុប:</b>\n"
-            f"បុគ្គលិកសរុប : <b>{len(worker_totals)} នាក់</b>\n"
-            f"ចំនួនថ្ងៃសរុប : <b>{len(day_blocks)} ថ្ងៃ</b>\n"
-            f"ម៉ោងការងារសរុប : <b>{total_hours_day_one:.1f} h</b>\n"
-            f"ប្រាក់ឈ្នួលសរុប : <b>{total_salary_day_one_usd:.2f}$ ({int(round(total_salary_day_one_riel)):,}៛)</b>"
+        footer_section = (
+            f"\n{separator}\n"
+            f"<b>សរុប</b>\n"
+            f"{separator}\n"
+            f"👥 បុគ្គលិកសរុប    : {len(worker_totals)} នាក់\n"
+            f"📅 ចំនួនថ្ងៃសរុប   : {len(day_blocks)} ថ្ងៃ\n"
+            f"⏱️ ម៉ោងការងារសរុប : {total_hours_day_one:.1f}h\n"
+            f"💰 ប្រាក់ឈ្នួលសរុប : ${total_salary_day_one_usd:.2f}\n"
+            f"🇰🇭 ស្មើនឹង        : {int(round(total_salary_day_one_riel)):,}៛"
         )
 
         db_status = ""
         if saved_ids:
             ids_str = ", ".join(map(str, saved_ids))
-            db_status = f"\n\nរក្សាទុកទិន្នន័យរួចរាល់ (Report IDs: {ids_str})"
+            db_status = (
+                f"✅ រក្សាទុកទិន្នន័យរួចរាល់\n"
+                f"🆔 Report IDs: #{ids_str}"
+            )
+            footer_section += f"\n\n{db_status}"
 
-        full_report = report_header + today_section + total_section + report_footer + db_status
+        full_report = report_header + breakdown_section + today_section + total_section + footer_section
         await update.message.reply_html(full_report)
 
 async def report_pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

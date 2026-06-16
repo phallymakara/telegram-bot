@@ -113,5 +113,27 @@ class TestParser(unittest.TestCase):
         self.assertEqual(blocks[0]['header'], "Day 1")
         self.assertEqual(blocks[1]['header'], "Day 2")
 
+    def test_parse_header_date_time(self):
+        from bot import parse_header_date_time
+        
+        # Test Khmer date patterns with time range
+        d, t = parse_header_date_time("ថ្ងៃទី: 20.06.26 (07:00 AM - 05:00 PM)")
+        self.assertEqual(d, "20.06.26")
+        self.assertEqual(t, "07:00 AM - 05:00 PM")
+        
+        d, t = parse_header_date_time("ងៃទី: 20.06.26 (7:00am - 5:00pm)")
+        self.assertEqual(d, "20.06.26")
+        self.assertEqual(t, "7:00am - 5:00pm")
+
+        # Test patterns without time range
+        d, t = parse_header_date_time("ថ្ងៃទី: 20.06.26")
+        self.assertEqual(d, "20.06.26")
+        self.assertIsNone(t)
+
+        # Test standard text header fallback
+        d, t = parse_header_date_time("Monday")
+        self.assertEqual(d, "Monday")
+        self.assertIsNone(t)
+
 if __name__ == '__main__':
     unittest.main()

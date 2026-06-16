@@ -1,12 +1,12 @@
-# Telegram Bot for Daily Attendance and Salary (Hourly Rate)
+# Telegram Bot for Daily Attendance and Salary (Daily Rate)
 
-A Telegram bot built in Python to automate the process of tracking daily worker attendance, computing hourly-rate salaries (in both Khmer Riel and USD), and generating PDF and Excel reports. It utilizes an SQLite database via SQLAlchemy, automatic multi-day parsing, and Khmer font caching for local and server execution.
+A Telegram bot built in Python to automate the process of tracking daily worker attendance, computing daily-rate salaries (where 8 hours equals 1 working day, in both Khmer Riel and USD), and generating PDF and Excel reports. It utilizes an SQLite database via SQLAlchemy, automatic multi-day parsing, and Khmer font caching for local and server execution.
 
 ---
 
 ## Features
 
-- **Employee Management:** Register, update, and bulk-import/delete employees with custom hourly rates.
+- **Employee Management:** Register, update, and bulk-import/delete employees with custom daily rates.
 - **Smart Message Parser:** Paste raw attendance sheets directly into Telegram. The bot parses multi-day blocks, matches names (handling minor typos and trailing punctuation), and reads hours (e.g., `8h`, `8.9 h`, `8 h`) and notes.
 - **Currency Conversion:** Instantly convert totals between Khmer Riel (KHR) and USD ($) using a configurable exchange rate.
 - **Automated Reports:** Generate PDF and Excel (.xlsx) spreadsheets for custom date ranges, complete with formatted summaries, tables, and formula-calculated totals.
@@ -21,8 +21,8 @@ A Telegram bot built in Python to automate the process of tracking daily worker 
 | :--- | :--- | :--- |
 | **`/start`** | None | Welcome message and initial greeting. |
 | **`/help`** | None | View detailed usage guide and data formats. |
-| **`/employees`** | None | List all registered employees, hourly rates, and current exchange rate. |
-| **`/addemployee`** | `<name> <hourly_rate>` | Register or update an employee's hourly rate (in Riel/hour). |
+| **`/employees`** | None | List all registered employees, daily rates, and current exchange rate. |
+| **`/addemployee`** | `<name> <daily_rate>` | Register or update an employee's daily rate (in Riel/day). |
 | **`/addemployees`** | `<bulk_list>` | Register multiple employees at once (separated by newlines). |
 | **`/updateemployee`** | `<old_name> -> <new_name>` | Change the name of a registered employee. |
 | **`/deleteemployee`** | `<name>` | Remove an employee and their attendance records. |
@@ -48,7 +48,7 @@ To record attendance for a single day, send a message with the following format:
 4. សួង សុង.     8 h (MEP)
 5. គុន ឡុន   2.5 h
 ```
-*Note: The first line is treated as the Day Header. Unregistered workers will show a warning indicator (Unregistered) and be computed with a default hourly rate of 0 KHR until registered.*
+*Note: The first line is treated as the Day Header. Unregistered workers will show a warning indicator (Unregistered) and be computed with a default daily rate of 0 KHR until registered.*
 
 ### Multi-Day Format Example
 You can send multiple day blocks in a single message. The parser automatically detects a new block whenever the index resets to 1 or is less than or equal to the previous line's index:
