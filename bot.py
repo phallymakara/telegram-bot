@@ -537,8 +537,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Totals for all employees in running totals database
-        absent_count = sum(1 for e in get_all_employees() if e.strip().lower() not in {w['name'].strip().lower() for w in parsed_workers})
-        absent_str = "គ្មាន" if absent_count == 0 else f"{absent_count} នាក់"
+        all_registered = get_all_employees()
+        today_names = {w['name'].strip().lower() for w in parsed_workers}
+        absent_names = [name for name in all_registered if name.strip().lower() not in today_names]
+        absent_str = "គ្មាន" if not absent_names else ", ".join(absent_names)
         
         grand_total_days = sum(info['days'] for info in running_totals.values())
         grand_total_days_str = f"{grand_total_days:.2f}" if grand_total_days % 1 != 0 else f"{int(grand_total_days)}"

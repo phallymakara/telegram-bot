@@ -121,7 +121,21 @@ def get_report_period_string(reports_data: list) -> str:
 
 
 def aggregate_summary_data(reports_data: list) -> dict:
+    from database import get_all_employees
+    all_registered = get_all_employees()
     summary = {}
+    for name, info in all_registered.items():
+        summary[name] = {
+            'days': 0.0,
+            'hours': 0.0,
+            'salary': 0.0,
+            'ot_hours': 0.0,
+            'borrow': 0.0,
+            'deduction': 0.0,
+            'rate': info['rate'] or 0.0,
+            'gender': info['gender'] or ""
+        }
+
     for data in reports_data:
         for record in data['records']:
             name = record.employee_name
@@ -382,16 +396,17 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
         ws_details.cell(row=3, column=curr_c, value=h)
 
     # Collect unique employee names
+    from database import get_all_employees
+    all_registered = get_all_employees()
     employees = sorted(list(set(
-        record.employee_name
-        for item in reports_data
-        for record in item['records']
+        list(all_registered.keys()) + 
+        [record.employee_name for item in reports_data for record in item['records']]
     )))
 
     # Map hours, notes and gender to (employee_name, report_id) or employee name
     hours_map = {}
     notes_map = {}
-    employee_gender = {}
+    employee_gender = {name: info['gender'] or "" for name, info in all_registered.items()}
     for item in reports_data:
         rep_id = item['report'].id
         for record in item['records']:
@@ -439,7 +454,7 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
                 ws_details.cell(row=det_row, column=c_idx + 2, value=borrow_val if borrow_val > 0 else "").number_format = '#,##0" ៛"'
                 ws_details.cell(row=det_row, column=c_idx + 3, value=cleaned_note)
             else:
-                ws_details.cell(row=det_row, column=c_idx, value="")
+                ws_details.cell(row=det_row, column=c_idx, value="អវត្តមាន")
                 ws_details.cell(row=det_row, column=c_idx + 1, value="")
                 ws_details.cell(row=det_row, column=c_idx + 2, value="")
                 ws_details.cell(row=det_row, column=c_idx + 3, value="")
@@ -455,15 +470,15 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
         L_net = get_column_letter(col_net)
 
         days_sum_parts = [f"{get_column_letter(c)}{det_row}" for c in range(6, 6 + 4*K, 4)]
-        days_formula = f"={'+'.join(days_sum_parts)}" if days_sum_parts else "=0"
+        days_formula = f"=SUM({','.join(days_sum_parts)})" if days_sum_parts else "=0"
         
         ot_sum_parts = [f"{get_column_letter(c + 1)}{det_row}" for c in range(6, 6 + 4*K, 4)]
-        ot_formula = f"={'+'.join(ot_sum_parts)}" if ot_sum_parts else "=0"
+        ot_formula = f"=SUM({','.join(ot_sum_parts)})" if ot_sum_parts else "=0"
         
         gross_formula = f"=({L_days}{det_row}*D{det_row})+({L_ot}{det_row}*E{det_row})"
         
         borrow_sum_parts = [f"{get_column_letter(c + 2)}{det_row}" for c in range(6, 6 + 4*K, 4)]
-        borrow_formula = f"={'+'.join(borrow_sum_parts)}" if borrow_sum_parts else "=0"
+        borrow_formula = f"=SUM({','.join(borrow_sum_parts)})" if borrow_sum_parts else "=0"
         
         debt_formula = f"={L_borrow}{det_row}+IF({L_borrow}{det_row}>=100000,{L_borrow}{det_row}*0.1,0)-{L_deduct}{det_row}"
         net_formula = f"={L_gross}{det_row}-{L_borrow}{det_row}-{L_deduct}{det_row}"
@@ -639,9 +654,22 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
         day_total_debt = 0.0
         day_total_net = 0.0
 
+        from database import get_all_employees
+        all_registered = get_all_employees()
+        present_names = {rec.employee_name.strip().lower() for rec in records}
+        absent_records = []
+        for name, info in all_registered.items():
+            if name.strip().lower() not in present_names:
+                absent_records.append({
+                    'name': name,
+                    'gender': info['gender'] or "",
+                    'daily_rate': info['rate'] or 0.0
+                })
+
         rows = ""
-        for i, rec in enumerate(records, 1):
-            row_class = "even" if i % 2 == 0 else ""
+        row_idx = 1
+        for rec in records:
+            row_class = "even" if row_idx % 2 == 0 else ""
             borrow_val, deduct_val, cleaned_note = parse_note_details(rec.note)
             
             if rec.hours > 1.0:
@@ -668,7 +696,7 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
 
             rows += f"""
                 <tr class="{row_class}">
-                    <td class="center">{i}</td>
+                    <td class="center">{row_idx}</td>
                     <td class="name">{rec.employee_name}</td>
                     <td class="center">{getattr(rec, 'gender', '') or ''}</td>
                     <td class="num">{day_val:.1f}</td>
@@ -681,6 +709,26 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
                     <td class="num">{int(round(net_val)):,} ៛</td>
                     <td>{cleaned_note}</td>
                 </tr>"""
+            row_idx += 1
+
+        for abs_rec in absent_records:
+            row_class = "even" if row_idx % 2 == 0 else ""
+            rows += f"""
+                <tr class="{row_class}" style="color: #888;">
+                    <td class="center">{row_idx}</td>
+                    <td class="name">{abs_rec['name']}</td>
+                    <td class="center">{abs_rec['gender']}</td>
+                    <td class="num" style="font-weight: bold; color: #d9534f;">អវត្តមាន</td>
+                    <td class="num">0.0</td>
+                    <td class="num">{abs_rec['daily_rate']:,.0f} ៛</td>
+                    <td class="num">0 ៛</td>
+                    <td class="num">0 ៛</td>
+                    <td class="num">0 ៛</td>
+                    <td class="num" style="color: red;">0 ៛</td>
+                    <td class="num">0 ៛</td>
+                    <td></td>
+                </tr>"""
+            row_idx += 1
 
         daily_sections += f"""
             <div class="day-block">
