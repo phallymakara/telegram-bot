@@ -118,7 +118,14 @@ def add_employee(name: str, daily_rate: float, gender: str = None) -> bool:
         records = db.query(AttendanceRecord).filter(AttendanceRecord.employee_name == name).all()
         for rec in records:
             rec.daily_rate = float(daily_rate)
-            rec.salary = (rec.hours / 8.0) * float(daily_rate)
+            if rec.hours > 1.0:
+                base_days = 1.0
+                ot_hours = max(0.0, rec.hours - 8.0)
+            else:
+                base_days = rec.hours / 8.0
+                ot_hours = 0.0
+            rec.multiplier = base_days + ot_hours / 8.0
+            rec.salary = rec.multiplier * float(daily_rate)
             if gender is not None:
                 rec.gender = gender
             
@@ -315,7 +322,13 @@ def save_attendance_report(date_str: str, day_header: str, workers_list: list) -
             rate = employee.daily_rate if employee else 0.0
             gender = employee.gender if employee else None
             
-            mult = hours / 8.0
+            if hours > 1.0:
+                base_days = 1.0
+                ot_hours = max(0.0, hours - 8.0)
+            else:
+                base_days = hours / 8.0
+                ot_hours = 0.0
+            mult = base_days + ot_hours / 8.0
             salary = mult * rate
             
             record = AttendanceRecord(
@@ -347,11 +360,18 @@ def get_accumulated_totals() -> dict:
             name = rec.employee_name
             if name not in totals:
                 totals[name] = {
+                    'days': 0.0,
                     'hours': 0.0,
                     'salary': 0.0,
                     'ot_hours': 0.0,
                     'ot_salary': 0.0
                 }
+            if rec.hours > 1.0:
+                base_days = 1.0
+            else:
+                base_days = rec.hours / 8.0
+            
+            totals[name]['days'] += base_days
             totals[name]['hours'] += rec.hours
             totals[name]['salary'] += rec.salary
             
@@ -441,7 +461,7 @@ def record_borrow(employee_name: str, borrow_amount: float, deduction_amount: fl
             employee = db.query(Employee).filter(Employee.name.ilike(employee_name.strip())).first()
             
         if not employee:
-            return False, f"Employee '<b>{employee_name}</b>' is not registered. Please register them first using <code>/addemployee</code>.", ""
+            return False, f"Employee '<b>{employee_name}</b>' is not registered. Please register them first using <code>/addemployees</code>.", ""
             
         # Update name to correct registered case/spelling
         employee_name = employee.name

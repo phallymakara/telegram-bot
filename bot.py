@@ -53,6 +53,41 @@ logger = logging.getLogger(__name__)
 # Cambodia Timezone (UTC+7)
 tz_kh = timezone(timedelta(hours=7))
 
+from functools import wraps
+
+# Parse ALLOWED_USERS from environment
+ALLOWED_USERS_RAW = os.getenv("ALLOWED_USERS", "")
+ALLOWED_USERS = []
+if ALLOWED_USERS_RAW:
+    ALLOWED_USERS = [x.strip() for x in ALLOWED_USERS_RAW.split(",") if x.strip()]
+
+def is_user_allowed(user) -> bool:
+    if not ALLOWED_USERS:
+        return True  # Public access if ALLOWED_USERS is not set or empty
+    if not user:
+        return False
+    # Check numeric ID as string
+    if str(user.id) in ALLOWED_USERS:
+        return True
+    # Check username case-insensitively
+    if user.username and user.username.lower() in [u.lower() for u in ALLOWED_USERS]:
+        return True
+    return False
+
+def restricted(func):
+    @wraps(func)
+    async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        user = update.effective_user
+        if not is_user_allowed(user):
+            if update.callback_query:
+                await update.callback_query.answer("⚠️ You do not have permission to use this bot.", show_alert=True)
+            elif update.message:
+                await update.message.reply_html("⚠️ <b>Access Denied:</b> You do not have permission to use this bot.")
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapped
+
+@restricted
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "👋 <b>សូមស្វាគមន៍មកកាន់ Telegram Bot គណនាវត្តមាន និងប្រាក់ឈ្នួល (Hourly Rate)!</b>\n"
@@ -64,20 +99,17 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_html(welcome_text)
 
+@restricted
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "📖 <b>របៀបប្រើប្រាស់ / How to Use:</b>\n\n"
         "👥 <b>ការគ្រប់គ្រងឈ្មោះបុគ្គលិក / Employee Management:</b>\n"
-        "• /addemployee &lt;ឈ្មោះ&gt; [ភេទ] &lt;តម្លៃថ្ងៃ&gt; - ចុះឈ្មោះ ឬកែសម្រួលព័ត៌មានបុគ្គលិក (ភេទ: ប ឬ ស)\n"
-        "  (ឧទា. <code>/addemployee ប៉ែន ទិត្យ ប 80000</code>)\n"
         "• /addemployees - ចុះឈ្មោះបុគ្គលិកច្រើននាក់ក្នុងពេលតែមួយ (បំបែកដោយចុះបន្ទាត់)\n"
         "  (ឧទា. <code>/addemployees\n"
         "  ប៉ែន ទិត្យ ប 80000\n"
         "  អៀម អេន ស 64000</code>)\n"
         "• /updateemployee &lt;ឈ្មោះចាស់&gt; -&gt; &lt;ឈ្មោះថ្មី&gt; - កែប្រែឈ្មោះបុគ្គលិក\n"
         "  (ឧទា. <code>/updateemployee ប៉ែន ទិត្យ -&gt; ប៉ែន ទិត្យថ្មី</code>)\n"
-        "• /deleteemployee &lt;ឈ្មោះ&gt; - លុបឈ្មោះបុគ្គលិកចេញពីប្រព័ន្ធ\n"
-        "  (ឧទា. <code>/deleteemployee ប៉ែន ទិត្យ</code>)\n"
         "• /deleteemployees - លុបឈ្មោះបុគ្គលិកច្រើននាក់ក្នុងពេលតែមួយ (បំបែកដោយចុះបន្ទាត់)\n"
         "  (ឧទា. <code>/deleteemployees\n"
         "  ប៉ែន ទិត្យ\n"
@@ -116,41 +148,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_html(help_text)
 
-async def addemployee_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    args = context.args
-    if len(args) < 2:
-        await update.message.reply_html(
-            "⚠️ Usage: <code>/addemployee &lt;name&gt; [gender] &lt;daily_rate&gt;</code>\n"
-            "Example: <code>/addemployee ប៉ែន ទិត្យ ប 80000</code>"
-        )
-        return
-
-    try:
-        daily_rate = float(args[-1])
-    except ValueError:
-        await update.message.reply_html("⚠️ Error: daily_rate must be a number.")
-        return
-
-    gender = ""
-    name_args = args[:-1]
-    if len(args) >= 3:
-        potential_gender = args[-2].strip()
-        normalized = detect_gender(potential_gender)
-        if normalized:
-            gender = normalized
-            name_args = args[:-2]
-
-    name = " ".join(name_args).strip()
-    if not name:
-        await update.message.reply_html("⚠️ Error: Employee name cannot be empty.")
-        return
-
-    add_employee(name, daily_rate, gender)
-    gender_part = f" ({gender})" if gender else ""
-    await update.message.reply_html(
-        f"✅ Employee <b>{name}</b>{gender_part} added/updated with daily rate <b>{daily_rate:,.0f}៛/day</b>."
-    )
-
+@restricted
 async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
     command_prefix = "/addemployees"
@@ -216,6 +214,7 @@ async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await update.message.reply_html(response_text)
 
+@restricted
 async def updateemployee_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Parse update.message.text to handle spaces and arrows
     message_text = update.message.text
@@ -249,22 +248,7 @@ async def updateemployee_command(update: Update, context: ContextTypes.DEFAULT_T
             f"⚠️ Error: Employee <b>{old_name}</b> not found, or name <b>{new_name}</b> is already registered."
         )
 
-async def deleteemployee_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    args = context.args
-    if not args:
-        await update.message.reply_html(
-            "⚠️ Usage: <code>/deleteemployee &lt;name&gt;</code>\n"
-            "Example: <code>/deleteemployee ប៉ែន ទិត្យ</code>"
-        )
-        return
-
-    name = " ".join(args).strip()
-    success = delete_employee(name)
-    if success:
-        await update.message.reply_html(f"✅ Employee <b>{name}</b> deleted successfully.")
-    else:
-        await update.message.reply_html(f"⚠️ Error: Employee <b>{name}</b> not found.")
-
+@restricted
 async def borrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if len(args) < 2:
@@ -286,13 +270,10 @@ async def borrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = " ".join(args[:-1]).strip()
 
     # Calculate deduction based on thresholds:
-    # > 400,000៛ -> 40,000៛
-    # > 200,000៛ and <= 400,000៛ -> 20,000៛
+    # >= 100,000៛ -> deduction is 10% of amount
     # Else -> 0៛
-    if amount > 400000:
-        deduction = 40000.0
-    elif amount > 200000:
-        deduction = 20000.0
+    if amount >= 100000:
+        deduction = amount * 0.10
     else:
         deduction = 0.0
 
@@ -309,17 +290,22 @@ async def borrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📅 <b>ថ្ងៃទី / Date:</b> <b>{report_day}</b>"
             )
         else:
+            interest = amount * 0.10 if amount >= 100000 else 0.0
+            debt = amount + interest - deduction
+            formatted_debt = f"{int(debt):,}"
             reply_text = (
                 "✅ <b>កត់ត្រាការខ្ចីប្រាក់ជោគជ័យ / Borrow Recorded:</b>\n\n"
                 f"👤 <b>បុគ្គលិក / Employee:</b> <b>{registered_name}</b>\n"
                 f"📅 <b>ថ្ងៃទី / Date:</b> <b>{report_day}</b>\n"
                 f"💵 <b>ខ្ចីលុយ / Borrow Amount:</b> <b>{formatted_amount}៛</b>\n"
-                f"✂️ <b>ប្រាក់កាត់ / Deduction:</b> <b>{formatted_deduction}៛</b>"
+                f"✂️ <b>ប្រាក់កាត់ / Deduction:</b> <b>{formatted_deduction}៛</b>\n"
+                f"🔴 <b>លុយជំពាក់ / Debt:</b> <b>{formatted_debt}៛</b>"
             )
         await update.message.reply_html(reply_text)
     else:
         await update.message.reply_html(result_or_error)
 
+@restricted
 async def deleteemployees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
     command_prefix = "/deleteemployees"
@@ -364,11 +350,12 @@ async def deleteemployees_command(update: Update, context: ContextTypes.DEFAULT_
 
     await update.message.reply_html(response_text)
 
+@restricted
 async def employees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     employees = get_all_employees()
     if not employees:
         await update.message.reply_html(
-            "ℹ️ No employees registered yet. Register employees using <code>/addemployee &lt;name&gt; &lt;daily_rate&gt;</code>."
+            "ℹ️ No employees registered yet. Register employees using <code>/addemployees</code>."
         )
         return
 
@@ -421,6 +408,7 @@ def parse_header_date_time(header: str):
         return date_part, time_part
     return header.strip(), None
 
+@restricted
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     if not text:
@@ -737,6 +725,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         full_report = report_header + breakdown_section + today_section + total_section + footer_section
         await update.message.reply_html(full_report)
 
+@restricted
 async def report_pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not REPORT_LIBS_AVAILABLE:
         await update.message.reply_html(
@@ -815,6 +804,7 @@ async def report_pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             except Exception:
                 pass
 
+@restricted
 async def report_excel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not REPORT_LIBS_AVAILABLE:
         await update.message.reply_html(
@@ -893,6 +883,7 @@ async def report_excel_command(update: Update, context: ContextTypes.DEFAULT_TYP
             except Exception:
                 pass
 
+@restricted
 async def setexchange_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if not args:
@@ -918,6 +909,7 @@ async def setexchange_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"1$ = <b>{rate:,.0f}៛</b>"
     )
 
+@restricted
 async def restartcount_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if there is any data to reset
     reports_data = get_reports_by_dates(None, None)
@@ -946,6 +938,7 @@ async def restartcount_command(update: Update, context: ContextTypes.DEFAULT_TYP
     )
     await update.message.reply_html(warning_text, reply_markup=reply_markup)
 
+@restricted
 async def restartcount_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1052,10 +1045,8 @@ async def post_init(application: Application) -> None:
         await application.bot.set_my_commands([
             BotCommand("start", "Start the bot / ផ្ដើមដំណើរការ"),
             BotCommand("help", "Show help and templates / បង្ហាញជំនួយ"),
-            BotCommand("addemployee", "Add/update employee hourly rate / បន្ថែមឬកែតម្លៃម៉ោងបុគ្គលិក"),
             BotCommand("addemployees", "Add multiple employees / បន្ថែមឈ្មោះបុគ្គលិកច្រើន"),
             BotCommand("updateemployee", "Rename employee / កែប្រែឈ្មោះបុគ្គលិក"),
-            BotCommand("deleteemployee", "Delete employee / លុបឈ្មោះបុគ្គលិក"),
             BotCommand("deleteemployees", "Delete multiple employees / លុបឈ្មោះបុគ្គលិកច្រើន"),
             BotCommand("employees", "List all registered employees / បញ្ជីឈ្មោះបុគ្គលិក"),
             BotCommand("setexchange", "Set KHR to USD exchange rate / កំណត់អត្រាប្តូរប្រាក់"),
@@ -1103,10 +1094,8 @@ def main():
     # Add Command Handlers
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("addemployee", addemployee_command))
     app.add_handler(CommandHandler("addemployees", addemployees_command))
     app.add_handler(CommandHandler("updateemployee", updateemployee_command))
-    app.add_handler(CommandHandler("deleteemployee", deleteemployee_command))
     app.add_handler(CommandHandler("deleteemployees", deleteemployees_command))
     app.add_handler(CommandHandler("employees", employees_command))
     app.add_handler(CommandHandler("setexchange", setexchange_command))

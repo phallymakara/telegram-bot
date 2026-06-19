@@ -19,17 +19,89 @@ _FONT_URLS = [
     "https://fonts.gstatic.com/s/nokora/v32/hESw6XVnNCxEvkbMpheEZo_H_w.ttf",
 ]
 
+def _get_local_font_path() -> str:
+    """Finds the first .ttf or .otf file in the fonts directory, falling back to _FONT_PATH."""
+    if os.path.exists(_FONTS_DIR):
+        try:
+            for f in os.listdir(_FONTS_DIR):
+                if f.lower().endswith(('.ttf', '.otf')):
+                    return os.path.join(_FONTS_DIR, f)
+        except Exception:
+            pass
+    return _FONT_PATH
+
+
 async def ensure_khmer_font_async() -> str:
-    """Check if Khmer font is cached locally. Returns path to font or empty string."""
-    if os.path.exists(_FONT_PATH):
-        return _FONT_PATH
+    """Check if Khmer font is cached locally. If not, download it in the background."""
+    local_path = _get_local_font_path()
+    if os.path.exists(local_path):
+        return local_path
+
+    os.makedirs(_FONTS_DIR, exist_ok=True)
+    logger.info("Khmer font not found locally. Preparing to download...")
+
+    import urllib.request
+    import ssl
+    import asyncio
+
+    ssl_ctx = ssl._create_unverified_context()
+
+    for url in _FONT_URLS:
+        try:
+            logger.info(f"Downloading Khmer font from {url}...")
+            
+            def download():
+                req = urllib.request.Request(
+                    url,
+                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                )
+                with urllib.request.urlopen(req, context=ssl_ctx, timeout=30) as response:
+                    with open(_FONT_PATH, "wb") as out_file:
+                        out_file.write(response.read())
+
+            await asyncio.to_thread(download)
+            logger.info(f"Khmer font downloaded successfully and saved to {_FONT_PATH}")
+            return _FONT_PATH
+        except Exception as e:
+            logger.error(f"Failed to download font from {url}: {e}")
+            if os.path.exists(_FONT_PATH):
+                try:
+                    os.remove(_FONT_PATH)
+                except Exception:
+                    pass
+
+    logger.error("Could not download any Khmer font. PDF rendering might use system/fallback fonts.")
     return ""
 
 
 def _ensure_khmer_font() -> str:
-    """Check if Khmer font is cached locally. Returns path to font or empty string."""
-    if os.path.exists(_FONT_PATH):
-        return _FONT_PATH
+    """Check if Khmer font is cached locally. Returns path to font, downloading if necessary."""
+    local_path = _get_local_font_path()
+    if os.path.exists(local_path):
+        return local_path
+
+    os.makedirs(_FONTS_DIR, exist_ok=True)
+    import urllib.request
+    import ssl
+
+    ssl_ctx = ssl._create_unverified_context()
+
+    for url in _FONT_URLS:
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            )
+            with urllib.request.urlopen(req, context=ssl_ctx, timeout=30) as response:
+                with open(_FONT_PATH, "wb") as out_file:
+                    out_file.write(response.read())
+            return _FONT_PATH
+        except Exception:
+            if os.path.exists(_FONT_PATH):
+                try:
+                    os.remove(_FONT_PATH)
+                except Exception:
+                    pass
     return ""
 
 
@@ -55,9 +127,17 @@ def aggregate_summary_data(reports_data: list) -> dict:
             name = record.employee_name
             gender_val = getattr(record, 'gender', '') or ''
             borrow_val, deduct_val, _ = parse_note_details(record.note)
-            ot_hours = max(0.0, record.hours - 8.0)
+            
+            if record.hours > 1.0:
+                rec_base_days = 1.0
+                rec_ot_hours = max(0.0, record.hours - 8.0)
+            else:
+                rec_base_days = record.hours / 8.0
+                rec_ot_hours = 0.0
+                
             if name not in summary:
                 summary[name] = {
+                    'days': 0.0,
                     'hours': 0.0,
                     'salary': 0.0,
                     'ot_hours': 0.0,
@@ -66,9 +146,10 @@ def aggregate_summary_data(reports_data: list) -> dict:
                     'rate': record.daily_rate,
                     'gender': gender_val
                 }
+            summary[name]['days'] += rec_base_days
             summary[name]['hours'] += record.hours
             summary[name]['salary'] += record.salary
-            summary[name]['ot_hours'] += ot_hours
+            summary[name]['ot_hours'] += rec_ot_hours
             summary[name]['borrow'] += borrow_val
             summary[name]['deduction'] += deduct_val
             if record.daily_rate > 0:
@@ -98,7 +179,7 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
     ws_summary.views.sheetView[0].showGridLines = True
     ws_summary.freeze_panes = 'E5'
 
-    ws_summary.merge_cells("A1:K1")
+    ws_summary.merge_cells("A1:L1")
     ws_summary["A1"] = "សរុបប្រាក់ឈ្នួល និងវត្តមាន"
     ws_summary["A1"].font = Font(name="Times New Roman", size=16, bold=True, color="1F497D")
     ws_summary["A1"].alignment = Alignment(horizontal="center")
@@ -116,6 +197,7 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
         "លុយសរុប (KHR)",
         "លុយបានខ្ចី សរុប (KHR)",
         "ប្រាក់កាត់ (KHR)",
+        "លុយជំពាក់ (KHR)",
         "លុយត្រូវបើក (KHR)",
         "លុយត្រូវបើក (USD)"
     ]
@@ -127,8 +209,11 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
 
     summary_data = aggregate_summary_data(reports_data)
     row_idx = 5
+    red_font = Font(name="Times New Roman", color="FF0000")
+    red_font_bold = Font(name="Times New Roman", bold=True, color="FF0000")
+    
     for name, stats in sorted(summary_data.items()):
-        base_days = (stats['hours'] - stats['ot_hours']) / 8.0
+        base_days = stats['days']
         
         ws_summary.cell(row=row_idx, column=1, value=name)
         ws_summary.cell(row=row_idx, column=2, value=stats.get('gender', '')) # ភេទ
@@ -141,13 +226,19 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
         ws_summary.cell(row=row_idx, column=7, value=f"=(E{row_idx}*C{row_idx})+(F{row_idx}*D{row_idx})").number_format = '#,##0" ៛"'
         ws_summary.cell(row=row_idx, column=8, value=stats['borrow']).number_format = '#,##0" ៛"'
         ws_summary.cell(row=row_idx, column=9, value=stats['deduction']).number_format = '#,##0" ៛"'
-        ws_summary.cell(row=row_idx, column=10, value=f"=G{row_idx}-H{row_idx}-I{row_idx}").number_format = '#,##0" ៛"'
-        ws_summary.cell(row=row_idx, column=11, value=f"=J{row_idx}/{exchange_rate}").number_format = '$#,##0.00'
+        # Debt: borrow + (10% if borrow >= 100000 else 0) - deduction
+        ws_summary.cell(row=row_idx, column=10, value=f"=H{row_idx}+IF(H{row_idx}>=100000,H{row_idx}*0.1,0)-I{row_idx}").number_format = '#,##0" ៛"'
+        # Net KHR: Gross - Borrow - Deduction
+        ws_summary.cell(row=row_idx, column=11, value=f"=G{row_idx}-H{row_idx}-I{row_idx}").number_format = '#,##0" ៛"'
+        ws_summary.cell(row=row_idx, column=12, value=f"=K{row_idx}/{exchange_rate}").number_format = '$#,##0.00'
         
-        for c in range(1, 12):
+        for c in range(1, 13):
             cell = ws_summary.cell(row=row_idx, column=c)
             cell.border = thin_border
-            cell.font = Font(name="Times New Roman")
+            if c == 10:
+                cell.font = red_font
+            else:
+                cell.font = Font(name="Times New Roman")
             if c in [1, 2]:
                 cell.alignment = Alignment(horizontal="center" if c == 2 else "left")
             else:
@@ -171,16 +262,23 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
     ws_summary.cell(row=row_idx, column=9, value=f"=SUM(I5:I{row_idx-1})").font = Font(name="Times New Roman", bold=True)
     ws_summary.cell(row=row_idx, column=9).number_format = '#,##0" ៛"'
     
-    ws_summary.cell(row=row_idx, column=10, value=f"=SUM(J5:J{row_idx-1})").font = Font(name="Times New Roman", bold=True)
+    ws_summary.cell(row=row_idx, column=10, value=f"=SUM(J5:J{row_idx-1})").font = red_font_bold
     ws_summary.cell(row=row_idx, column=10).number_format = '#,##0" ៛"'
     
     ws_summary.cell(row=row_idx, column=11, value=f"=SUM(K5:K{row_idx-1})").font = Font(name="Times New Roman", bold=True)
-    ws_summary.cell(row=row_idx, column=11).number_format = '$#,##0.00'
+    ws_summary.cell(row=row_idx, column=11).number_format = '#,##0" ៛"'
+    
+    ws_summary.cell(row=row_idx, column=12, value=f"=SUM(L5:L{row_idx-1})").font = Font(name="Times New Roman", bold=True)
+    ws_summary.cell(row=row_idx, column=12).number_format = '$#,##0.00'
     
     double_bottom = Border(top=Side(style='thin', color='000000'), bottom=Side(style='double', color='000000'))
-    for c in range(1, 12):
+    for c in range(1, 13):
         cell = ws_summary.cell(row=row_idx, column=c)
         cell.border = double_bottom
+        if c == 10:
+            cell.font = red_font_bold
+        elif c > 1:
+            cell.font = Font(name="Times New Roman", bold=True)
         if c > 1:
             cell.alignment = Alignment(horizontal="right")
 
@@ -215,7 +313,8 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
     col_gross = col_days + 2
     col_borrow = col_days + 3
     col_deduct = col_days + 4
-    col_net = col_days + 5
+    col_debt = col_days + 5
+    col_net = col_days + 6
 
     last_col_letter = get_column_letter(col_net)
 
@@ -273,6 +372,7 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
         "លុយសរុប",
         "លុយបានខ្ចី សរុប",
         "ប្រាក់កាត់",
+        "លុយជំពាក់",
         "លុយត្រូវបើក"
     ]
     for idx, h in enumerate(summary_headers):
@@ -328,8 +428,12 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
                 total_deductions_val += deduct_val
                 
             if hours is not None:
-                day_val = min(8.0, hours) / 8.0
-                ot_val = max(0.0, hours - 8.0)
+                if hours > 1.0:
+                    day_val = 1.0
+                    ot_val = max(0.0, hours - 8.0)
+                else:
+                    day_val = hours / 8.0
+                    ot_val = 0.0
                 ws_details.cell(row=det_row, column=c_idx, value=day_val).number_format = '#,##0.0'
                 ws_details.cell(row=det_row, column=c_idx + 1, value=ot_val).number_format = '#,##0.0'
                 ws_details.cell(row=det_row, column=c_idx + 2, value=borrow_val if borrow_val > 0 else "").number_format = '#,##0" ៛"'
@@ -347,6 +451,7 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
         L_gross = get_column_letter(col_gross)
         L_borrow = get_column_letter(col_borrow)
         L_deduct = get_column_letter(col_deduct)
+        L_debt = get_column_letter(col_debt)
         L_net = get_column_letter(col_net)
 
         days_sum_parts = [f"{get_column_letter(c)}{det_row}" for c in range(6, 6 + 4*K, 4)]
@@ -360,6 +465,7 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
         borrow_sum_parts = [f"{get_column_letter(c + 2)}{det_row}" for c in range(6, 6 + 4*K, 4)]
         borrow_formula = f"={'+'.join(borrow_sum_parts)}" if borrow_sum_parts else "=0"
         
+        debt_formula = f"={L_borrow}{det_row}+IF({L_borrow}{det_row}>=100000,{L_borrow}{det_row}*0.1,0)-{L_deduct}{det_row}"
         net_formula = f"={L_gross}{det_row}-{L_borrow}{det_row}-{L_deduct}{det_row}"
 
         ws_details.cell(row=det_row, column=col_days, value=days_formula).number_format = '#,##0.0'
@@ -367,16 +473,20 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
         ws_details.cell(row=det_row, column=col_gross, value=gross_formula).number_format = '#,##0" ៛"'
         ws_details.cell(row=det_row, column=col_borrow, value=borrow_formula).number_format = '#,##0" ៛"'
         ws_details.cell(row=det_row, column=col_deduct, value=total_deductions_val).number_format = '#,##0" ៛"'
+        ws_details.cell(row=det_row, column=col_debt, value=debt_formula).number_format = '#,##0" ៛"'
         ws_details.cell(row=det_row, column=col_net, value=net_formula).number_format = '#,##0" ៛"'
 
         # Styling
         for c in range(1, col_net + 1):
             cell = ws_details.cell(row=det_row, column=c)
             cell.border = thin_border
-            cell.font = Font(name="Times New Roman")
+            if c == col_debt:
+                cell.font = red_font
+            else:
+                cell.font = Font(name="Times New Roman")
             if c in [1, 3]:
                 cell.alignment = Alignment(horizontal="center")
-            elif c == 2 or (c >= 6 and (c - 6) % 4 == 3):
+            elif c == 2 or (c >= 6 and c < col_days and (c - 6) % 4 == 3):
                 cell.alignment = Alignment(horizontal="left")
             else:
                 cell.alignment = Alignment(horizontal="right")
@@ -399,7 +509,7 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
         col_let = get_column_letter(base_c + 2)
         ws_details.cell(row=det_row, column=base_c + 2, value=f"=SUM({col_let}5:{col_let}{det_row-1})").number_format = '#,##0" ៛"'
         
-    for c in [col_days, col_ot, col_gross, col_borrow, col_deduct, col_net]:
+    for c in [col_days, col_ot, col_gross, col_borrow, col_deduct, col_debt, col_net]:
         col_let = get_column_letter(c)
         ws_details.cell(row=det_row, column=c, value=f"=SUM({col_let}5:{col_let}{det_row-1})")
         if c in [col_days, col_ot]:
@@ -411,7 +521,10 @@ def generate_excel_report(reports_data: list, output_path: str, exchange_rate: f
     for c in range(1, col_net + 1):
         cell = ws_details.cell(row=det_row, column=c)
         cell.border = double_bottom
-        cell.font = Font(name="Times New Roman", bold=True)
+        if c == col_debt:
+            cell.font = red_font_bold
+        else:
+            cell.font = Font(name="Times New Roman", bold=True)
         if c >= 4:
             cell.alignment = Alignment(horizontal="right")
         elif c in [1, 3]:
@@ -457,12 +570,13 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
     total_gross_sum = 0.0
     total_borrow_sum = 0.0
     total_deduct_sum = 0.0
+    total_debt_sum = 0.0
 
     # Summary table rows
     summary_rows = ""
     for i, (name, stats) in enumerate(sorted(summary_data.items()), 1):
         row_class = "even" if i % 2 == 0 else ""
-        base_days = (stats['hours'] - stats['ot_hours']) / 8.0
+        base_days = stats['days']
         ot_hours = stats['ot_hours']
         
         hourly_rate = stats['rate'] / 8.0
@@ -470,11 +584,15 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
         net_salary = gross_salary - stats['borrow'] - stats['deduction']
         net_salary_usd = net_salary / exchange_rate
         
+        interest = stats['borrow'] * 0.10 if stats['borrow'] >= 100000 else 0.0
+        debt = stats['borrow'] + interest - stats['deduction']
+        
         total_days_sum += base_days
         total_ot_sum += ot_hours
         total_gross_sum += gross_salary
         total_borrow_sum += stats['borrow']
         total_deduct_sum += stats['deduction']
+        total_debt_sum += debt
 
         summary_rows += f"""
             <tr class="{row_class}">
@@ -488,6 +606,7 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
                 <td class="num">{int(round(gross_salary)):,} ៛</td>
                 <td class="num">{int(round(stats['borrow'])):,} ៛</td>
                 <td class="num">{int(round(stats['deduction'])):,} ៛</td>
+                <td class="num" style="color: red;">{int(round(debt)):,} ៛</td>
                 <td class="num">${net_salary_usd:.2f}</td>
                 <td class="num">{int(round(net_salary)):,} ៛</td>
             </tr>"""
@@ -517,6 +636,7 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
         day_total_gross = 0.0
         day_total_borrow = 0.0
         day_total_deduct = 0.0
+        day_total_debt = 0.0
         day_total_net = 0.0
 
         rows = ""
@@ -524,18 +644,26 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
             row_class = "even" if i % 2 == 0 else ""
             borrow_val, deduct_val, cleaned_note = parse_note_details(rec.note)
             
-            day_val = min(8.0, rec.hours) / 8.0
-            ot_val = max(0.0, rec.hours - 8.0)
+            if rec.hours > 1.0:
+                day_val = 1.0
+                ot_val = max(0.0, rec.hours - 8.0)
+            else:
+                day_val = rec.hours / 8.0
+                ot_val = 0.0
             
             h_rate = rec.daily_rate / 8.0
             gross_val = day_val * rec.daily_rate + ot_val * h_rate
             net_val = gross_val - borrow_val - deduct_val
+            
+            daily_interest = borrow_val * 0.10 if borrow_val >= 100000 else 0.0
+            daily_debt = borrow_val + daily_interest - deduct_val
             
             day_total_days += day_val
             day_total_ot += ot_val
             day_total_gross += gross_val
             day_total_borrow += borrow_val
             day_total_deduct += deduct_val
+            day_total_debt += daily_debt
             day_total_net += net_val
 
             rows += f"""
@@ -549,6 +677,7 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
                     <td class="num">{int(round(gross_val)):,} ៛</td>
                     <td class="num">{int(round(borrow_val)):,} ៛</td>
                     <td class="num">{int(round(deduct_val)):,} ៛</td>
+                    <td class="num" style="color: red;">{int(round(daily_debt)):,} ៛</td>
                     <td class="num">{int(round(net_val)):,} ៛</td>
                     <td>{cleaned_note}</td>
                 </tr>"""
@@ -568,6 +697,7 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
                             <th class="num">លុយសរុប</th>
                             <th class="num">ខ្ចី</th>
                             <th class="num">កាត់</th>
+                            <th class="num" style="color: red;">លុយជំពាក់</th>
                             <th class="num">ត្រូវបើក</th>
                             <th>សម្គាល់</th>
                         </tr>
@@ -582,6 +712,7 @@ def _build_report_html(reports_data: list, period_str: str, font_path: str, exch
                             <td class="num">{int(round(day_total_gross)):,} ៛</td>
                             <td class="num">{int(round(day_total_borrow)):,} ៛</td>
                             <td class="num">{int(round(day_total_deduct)):,} ៛</td>
+                            <td class="num" style="color: red;">{int(round(day_total_debt)):,} ៛</td>
                             <td class="num">{int(round(day_total_net)):,} ៛</td>
                             <td></td>
                         </tr>
@@ -719,6 +850,7 @@ tfoot.grand-total td {{
             <th class="num">លុយសរុប</th>
             <th class="num">ខ្ចីសរុប</th>
             <th class="num">ប្រាក់កាត់</th>
+            <th class="num" style="color: red;">លុយជំពាក់</th>
             <th class="num">ត្រូវបើក ($)</th>
             <th class="num">ត្រូវបើក (៛)</th>
         </tr>
@@ -734,6 +866,7 @@ tfoot.grand-total td {{
             <td class="num">{int(round(total_gross_sum)):,} ៛</td>
             <td class="num">{int(round(total_borrow_sum)):,} ៛</td>
             <td class="num">{int(round(total_deduct_sum)):,} ៛</td>
+            <td class="num" style="color: red;">{int(round(total_debt_sum)):,} ៛</td>
             <td class="num">${total_net_usd_sum:.2f}</td>
             <td class="num">{int(round(total_net_khr_sum)):,} ៛</td>
         </tr>

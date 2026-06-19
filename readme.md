@@ -22,10 +22,8 @@ A Telegram bot built in Python to automate the process of tracking daily worker 
 | **`/start`** | None | Welcome message and initial greeting. |
 | **`/help`** | None | View detailed usage guide and data formats. |
 | **`/employees`** | None | List all registered employees, daily rates, and current exchange rate. |
-| **`/addemployee`** | `<name> <daily_rate>` | Register or update an employee's daily rate (in Riel/day). |
 | **`/addemployees`** | `<bulk_list>` | Register multiple employees at once (separated by newlines). |
 | **`/updateemployee`** | `<old_name> -> <new_name>` | Change the name of a registered employee. |
-| **`/deleteemployee`** | `<name>` | Remove an employee and their attendance records. |
 | **`/deleteemployees`** | `<bulk_list>` | Bulk remove employees (separated by newlines). |
 | **`/setexchange`** | `[rate]` | Set or view the exchange rate (e.g., `/setexchange 4100`). |
 | **`/report_pdf`** | `[start_date] [end_date]` | Generate and download a PDF report for a range or single day (format: `DD.MM.YY`). |
@@ -122,7 +120,7 @@ Create a `.env` configuration file in the project root:
 cp .env.example .env
 ```
 
-Open the `.env` file using a text editor and enter your Telegram Bot Token. 
+Open the `.env` file using a text editor and enter your Telegram Bot Token and configure allowed access restrictions. 
 
 To get a token:
 1. Message [@BotFather](https://t.me/BotFather) on Telegram.
@@ -133,6 +131,10 @@ Configure `.env` as follows:
 ```env
 BOT_TOKEN=your_telegram_bot_token_here
 DATABASE_URL=sqlite:///attendance.db
+
+# Access restrictions: whitelist of allowed Telegram usernames and/or user IDs (comma-separated).
+# If left empty or omitted, anyone can access and use the bot.
+ALLOWED_USERS=your_username,another_username,123456789
 ```
 
 ### 7. Run Database Initializations
