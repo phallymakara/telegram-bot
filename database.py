@@ -366,10 +366,7 @@ def get_accumulated_totals() -> dict:
                     'ot_hours': 0.0,
                     'ot_salary': 0.0
                 }
-            if rec.hours > 1.0:
-                base_days = 1.0
-            else:
-                base_days = rec.hours / 8.0
+            base_days = min(8.0, rec.hours) / 8.0
             
             totals[name]['days'] += base_days
             totals[name]['hours'] += rec.hours

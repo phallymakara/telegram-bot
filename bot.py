@@ -463,8 +463,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             salary = (hours / 8.0) * rate
 
+            days_val = min(8.0, hours) / 8.0
+            days_str = f"{days_val:.2f}" if days_val % 1 != 0 else f"{int(days_val)}"
+
             accum_hours = running_totals.get(name, {}).get('hours', hours)
             accum_salary = running_totals.get(name, {}).get('salary', salary)
+            accum_days = running_totals.get(name, {}).get('days', days_val)
 
             salary_usd = salary / exchange_rate
             accum_salary_usd = accum_salary / exchange_rate
@@ -477,6 +481,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             accum_ot_salary = running_totals.get(name, {}).get('ot_salary', ot_salary)
             accum_ot_salary_usd = accum_ot_salary / exchange_rate
 
+            accum_days_str = f"{accum_days:.2f}" if accum_days % 1 != 0 else f"{int(accum_days)}"
+
             # Build lines for today
             label_suffix = ""
             if is_unregistered:
@@ -487,10 +493,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             num_emoji = get_num_emoji(idx)
             today_worker_block = (
                 f"{num_emoji} <b>{name}</b>{label_suffix}\n"
-                f"• ម៉ោងធ្វើការ : {hours:.1f}h\n"
-                f"• ម៉ោងថែម    : {ot_hours:.1f}h\n"
-                f"• ប្រាក់ថែម   : {int(round(ot_salary)):,}៛ (${ot_salary_usd:.2f})\n"
-                f"• សរុបថ្ងៃនេះ : {int(round(salary)):,}៛ (${salary_usd:.2f})"
+                f"• ថ្ងៃធ្វើការ     : {days_str} ថ្ងៃ\n"
+                f"• ថែមម៉ោង    : {ot_hours:.1f}h\n"
+                f"• ប្រាក់ថែម    : {int(round(ot_salary)):,}៛ (${ot_salary_usd:.2f})\n"
+                f"• សរុបថ្ងៃនេះ  : {int(round(salary)):,}៛ (${salary_usd:.2f})"
             )
             details_today_lines.append(today_worker_block)
 
@@ -501,9 +507,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             total_worker_block = (
                 f"{num_emoji} <b>{name}</b>{total_label_suffix}\n"
-                f"• ម៉ោងសរុប : {accum_hours:.1f}h\n"
-                f"• ម៉ោងថែម : {accum_ot_hours:.1f}h\n"
-                f"• ប្រាក់សរុប : {int(round(accum_salary)):,}៛ (${accum_salary_usd:.2f})"
+                f"• ថ្ងៃធ្វើការ    : {accum_days_str} ថ្ងៃ\n"
+                f"• ថែមម៉ោង   : {accum_ot_hours:.1f}h\n"
+                f"• ប្រាក់សរុប  : {int(round(accum_salary)):,}៛ (${accum_salary_usd:.2f})"
             )
             details_total_lines.append(total_worker_block)
 
@@ -531,18 +537,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Totals for all employees in running totals database
-        total_hours_day_one = sum(info['hours'] for info in running_totals.values())
-        total_salary_day_one_riel = sum(info['salary'] for info in running_totals.values())
-        total_salary_day_one_usd = total_salary_day_one_riel / exchange_rate
+        absent_count = sum(1 for e in get_all_employees() if e.strip().lower() not in {w['name'].strip().lower() for w in parsed_workers})
+        absent_str = "គ្មាន" if absent_count == 0 else f"{absent_count} នាក់"
+        
+        grand_total_days = sum(info['days'] for info in running_totals.values())
+        grand_total_days_str = f"{grand_total_days:.2f}" if grand_total_days % 1 != 0 else f"{int(grand_total_days)}"
+        
+        grand_total_ot = sum(info['ot_hours'] for info in running_totals.values())
+        grand_total_ot_str = f"{grand_total_ot:.1f}h"
+        
+        grand_total_salary_riel = sum(info['salary'] for info in running_totals.values())
+        grand_total_salary_usd = grand_total_salary_riel / exchange_rate
 
         footer_section = (
             f"\n{separator}\n"
             f"<b>សរុប</b>\n"
             f"{separator}\n"
-            f"👥 វត្តមានសរុប      : {total_staff} នាក់\n"
-            f"⏱️ ម៉ោងការងារសរុប  : {total_hours_day_one:.1f}h\n"
-            f"💰 ប្រាក់ឈ្នួលសរុប : ${total_salary_day_one_usd:.2f}\n"
-            f"🇰🇭 ស្មើនឹង        : {int(round(total_salary_day_one_riel)):,}៛"
+            f"វត្តមានសរុបថ្ងៃនេះ : {total_staff} នាក់\n"
+            f"អវត្តមានថ្ងៃនេះ      : {absent_str}\n"
+            f"ថ្ងៃធ្វើការសរុប       : {grand_total_days_str} ថ្ងៃ\n"
+            f"ថែមម៉ោងសរុប      : {grand_total_ot_str}\n\n"
+            f"💰 ប្រាក់ឈ្នួលសរុប : ${grand_total_salary_usd:,.2f}\n"
+            f"🇰🇭 ស្មើនឹង              : {int(round(grand_total_salary_riel)):,}៛"
         )
 
         if db_status:
@@ -603,7 +619,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         'rate': rate
                     }
 
-                worker_totals[name]['days'] += hours / default_hours_per_day
+                worker_totals[name]['days'] += min(8.0, hours) / default_hours_per_day
                 worker_totals[name]['hours'] += hours
                 worker_totals[name]['salary'] += salary
                 worker_totals[name]['ot_hours'] += ot_hours
@@ -632,11 +648,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             accum_salary = running_totals.get(name, {}).get('salary', 0.0)
             accum_ot_hours = running_totals.get(name, {}).get('ot_hours', 0.0)
             accum_ot_salary = running_totals.get(name, {}).get('ot_salary', 0.0)
+            accum_days = running_totals.get(name, {}).get('days', 0.0)
 
             stats_salary_usd = stats['salary'] / exchange_rate
             accum_salary_usd = accum_salary / exchange_rate
             stats_ot_salary_usd = stats['ot_salary'] / exchange_rate
             accum_ot_salary_usd = accum_ot_salary / exchange_rate
+
+            accum_days_str = f"{accum_days:.2f}" if accum_days % 1 != 0 else f"{int(accum_days)}"
 
             label_suffix = ""
             if stats['unregistered']:
@@ -649,11 +668,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Today's report block details line
             report_str = (
                 f"{num_emoji} <b>{name}</b>{label_suffix}\n"
-                f"• ចំនួនថ្ងៃ   : {days_str} ថ្ងៃ\n"
-                f"• ម៉ោងសរុប  : {stats['hours']:.1f}h\n"
-                f"• ម៉ោងថែម   : {stats['ot_hours']:.1f}h\n"
-                f"• ប្រាក់ថែម  : {int(round(stats['ot_salary'])):,}៛ (${stats_ot_salary_usd:.2f})\n"
-                f"• ប្រាក់សរុប : {int(round(stats['salary'])):,}៛ (${stats_salary_usd:.2f})"
+                f"• ថ្ងៃធ្វើការ     : {days_str} ថ្ងៃ\n"
+                f"• ថែមម៉ោង    : {stats['ot_hours']:.1f}h\n"
+                f"• ប្រាក់ថែម    : {int(round(stats['ot_salary'])):,}៛ (${stats_ot_salary_usd:.2f})\n"
+                f"• ប្រាក់សរុប   : {int(round(stats['salary'])):,}៛ (${stats_salary_usd:.2f})"
             )
             details_report_lines.append(report_str)
 
@@ -664,9 +682,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             total_str = (
                 f"{num_emoji} <b>{name}</b>{total_label_suffix}\n"
-                f"• ម៉ោងសរុប : {accum_hours:.1f}h\n"
-                f"• ម៉ោងថែម : {accum_ot_hours:.1f}h\n"
-                f"• ប្រាក់សរុប : {int(round(accum_salary)):,}៛ (${accum_salary_usd:.2f})"
+                f"• ថ្ងៃធ្វើការ    : {accum_days_str} ថ្ងៃ\n"
+                f"• ថែមម៉ោង   : {accum_ot_hours:.1f}h\n"
+                f"• ប្រាក់សរុប  : {int(round(accum_salary)):,}៛ (${accum_salary_usd:.2f})"
             )
             details_total_lines.append(total_str)
 
@@ -702,15 +720,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             + "\n\n".join(details_total_lines) + "\n"
         )
 
+        grand_total_days = sum(info['days'] for info in running_totals.values())
+        grand_total_days_str = f"{grand_total_days:.2f}" if grand_total_days % 1 != 0 else f"{int(grand_total_days)}"
+
+        grand_total_ot = sum(info['ot_hours'] for info in running_totals.values())
+        grand_total_ot_str = f"{grand_total_ot:.1f}h"
+
         footer_section = (
             f"\n{separator}\n"
             f"<b>សរុប</b>\n"
             f"{separator}\n"
             f"👥 បុគ្គលិកសរុប    : {len(worker_totals)} នាក់\n"
             f"📅 ចំនួនថ្ងៃសរុប   : {len(day_blocks)} ថ្ងៃ\n"
-            f"⏱️ ម៉ោងការងារសរុប : {total_hours_day_one:.1f}h\n"
-            f"💰 ប្រាក់ឈ្នួលសរុប : ${total_salary_day_one_usd:.2f}\n"
-            f"🇰🇭 ស្មើនឹង        : {int(round(total_salary_day_one_riel)):,}៛"
+            f"ថ្ងៃធ្វើការសរុប       : {grand_total_days_str} ថ្ងៃ\n"
+            f"ថែមម៉ោងសរុប      : {grand_total_ot_str}\n\n"
+            f"💰 ប្រាក់ឈ្នួលសរុប : ${total_salary_day_one_usd:,.2f}\n"
+            f"🇰🇭 ស្មើនឹង              : {int(round(total_salary_day_one_riel)):,}៛"
         )
 
         db_status = ""
