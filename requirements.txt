@@ -4,4 +4,4 @@ apscheduler
 python-dotenv
 openpyxl
 playwright
-playwright install --with-deps chromium
+# playwright install --with-deps chromium
