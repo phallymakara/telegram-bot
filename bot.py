@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import re
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
@@ -151,11 +152,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
-    command_prefix = "/addemployees"
-    if not message_text.startswith(command_prefix):
+    command_match = re.match(r'^/addemployees(?:@\w+)?\s*', message_text)
+    if not command_match:
         return
 
-    content = message_text[len(command_prefix):].strip()
+    content = message_text[command_match.end():].strip()
     if not content:
         await update.message.reply_html(
             "⚠️ Usage:\n"
@@ -218,11 +219,11 @@ async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYP
 async def updateemployee_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Parse update.message.text to handle spaces and arrows
     message_text = update.message.text
-    command_prefix = "/updateemployee"
-    if not message_text.startswith(command_prefix):
+    command_match = re.match(r'^/updateemployee(?:@\w+)?\s*', message_text)
+    if not command_match:
         return
 
-    command_args = message_text[len(command_prefix):].strip()
+    command_args = message_text[command_match.end():].strip()
     if "->" not in command_args:
         await update.message.reply_html(
             "⚠️ Usage: <code>/updateemployee &lt;old_name&gt; -&gt; &lt;new_name&gt;</code>\n"
@@ -308,11 +309,11 @@ async def borrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def deleteemployees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
-    command_prefix = "/deleteemployees"
-    if not message_text.startswith(command_prefix):
+    command_match = re.match(r'^/deleteemployees(?:@\w+)?\s*', message_text)
+    if not command_match:
         return
 
-    content = message_text[len(command_prefix):].strip()
+    content = message_text[command_match.end():].strip()
     if not content:
         await update.message.reply_html(
             "⚠️ Usage:\n"
