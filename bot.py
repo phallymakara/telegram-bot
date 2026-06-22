@@ -131,19 +131,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Please copy and edit the data format below, then send it to the Bot:\n\n"
         "<code>"
         "ថ្ងៃទី: 11.06.26 (7:00am - 5:00pm)\n"
-        "1. ប៉ែន ទិត្យ.   8 h\n"
-        "2. អៀម អេន.     8.9 h\n"
-        "3. ធិន        8.3 h\n"
-        "4. សួង សុង 8h\n"
-        "5. គុន ឡុន   2.5 h\n"
-        "6. ម៉ាច សិន 6 h\n"
-        "7. សេង សុីណាត 7 h\n"
-        "8. ម៉ៅ ម៉ាច 9.1 h\n"
-        "9. ផូ បុផា 8 h\n"
+        "1. ប៉ែន ទិត្យ.      [ 0 h ]\n"
+        "2. អៀម អេន.       [ 2 h - villa ]\n"
+        "3. គុន ឡុន         [ 0.5 h ]\n"
+        "4. សួង សុង        [ 0 h ]\n"
+        "5. ម៉ាច សិន       [ 1.5 h - condo ]\n"
         "</code>\n\n"
         "💡 <b>ចំណាំ / Rules:</b>\n"
         "• បញ្ជីនីមួយៗត្រូវផ្តើមដោយលេខលំដាប់ (ឧទា. <code>1.</code>)\n"
-        "• ចំនួនម៉ោងធ្វើការត្រូវដាក់នៅចុងបញ្ចប់នៃបន្ទាត់ (ឧទា. <code>8 h</code> ឬ <code>8.9 h</code> ឬ <code>8h</code>)\n"
+        "• ម៉ោងធ្វើការត្រូវដាក់ក្នុងវង់ក្រចកការ៉េ ឧទាហរណ៍ <code>[ 0 h ]</code> មានន័យថាធ្វើការធម្មតា (៨ម៉ោង)។ ប្រសិនបើលើសពី 0 (ឧទា. <code>[ 2 h ]</code>) គឺគិតជាម៉ោងថែម (OT)។\n"
+        "• <code>[ 0 h ]</code> means working a standard full day (8 hours). If hours > 0 (e.g. <code>[ 2 h ]</code>), it represents standard day + extra overtime hours.\n"
         "• តម្លៃថ្ងៃរបស់បុគ្គលិកដែលមិនទាន់ចុះឈ្មោះគឺ 0៛ (នឹងបង្ហាញសញ្ញាព្រមាន ⚠️)\n"
         "• ប្រាក់ឈ្នួល = (ម៉ោងធ្វើការសរុប ÷ 8) × តម្លៃថ្ងៃ"
     )
@@ -152,7 +149,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
-    command_match = re.match(r'^/addemployees(?:@\w+)?\s*', message_text)
+    command_match = re.match(r'^/addemployees?(?:@\w+)?\s*', message_text)
     if not command_match:
         return
 
@@ -196,9 +193,13 @@ async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYP
                 error_list.append(f"• <code>{cleaned}</code> (Name cannot be empty)")
                 continue
 
-            add_employee(name, rate, gender)
-            gender_part = f" ({gender})" if gender else ""
-            success_list.append(f"• <b>{name}</b>{gender_part}: {rate:,.0f}៛/day")
+            try:
+                add_employee(name, rate, gender)
+                gender_part = f" ({gender})" if gender else ""
+                success_list.append(f"• <b>{name}</b>{gender_part}: {rate:,.0f}៛/day")
+            except Exception as e:
+                logger.error(f"Database error adding employee {name}: {e}")
+                error_list.append(f"• <code>{name}</code> (Database error: {e})")
         except ValueError:
             error_list.append(f"• <code>{cleaned}</code> (Rate must be a number)")
 
@@ -219,7 +220,7 @@ async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYP
 async def updateemployee_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Parse update.message.text to handle spaces and arrows
     message_text = update.message.text
-    command_match = re.match(r'^/updateemployee(?:@\w+)?\s*', message_text)
+    command_match = re.match(r'^/updateemployees?(?:@\w+)?\s*', message_text)
     if not command_match:
         return
 
@@ -232,22 +233,26 @@ async def updateemployee_command(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     parts = command_args.split("->", 1)
-    old_name = parts[0].strip()
-    new_name = parts[1].strip()
+    old_name = re.sub(r'\s+', ' ', parts[0]).strip()
+    new_name = re.sub(r'\s+', ' ', parts[1]).strip()
 
     if not old_name or not new_name:
         await update.message.reply_html("⚠️ Error: Old name and new name cannot be empty.")
         return
 
-    success = update_employee_name(old_name, new_name)
-    if success:
-        await update.message.reply_html(
-            f"✅ Employee <b>{old_name}</b> renamed to <b>{new_name}</b>."
-        )
-    else:
-        await update.message.reply_html(
-            f"⚠️ Error: Employee <b>{old_name}</b> not found, or name <b>{new_name}</b> is already registered."
-        )
+    try:
+        success = update_employee_name(old_name, new_name)
+        if success:
+            await update.message.reply_html(
+                f"✅ Employee <b>{old_name}</b> renamed to <b>{new_name}</b>."
+            )
+        else:
+            await update.message.reply_html(
+                f"⚠️ Error: Employee <b>{old_name}</b> not found, or name <b>{new_name}</b> is already registered."
+            )
+    except Exception as e:
+        logger.error(f"Database error updating employee {old_name} to {new_name}: {e}")
+        await update.message.reply_html(f"⚠️ Database error: {e}")
 
 @restricted
 async def borrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -309,7 +314,7 @@ async def borrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def deleteemployees_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
-    command_match = re.match(r'^/deleteemployees(?:@\w+)?\s*', message_text)
+    command_match = re.match(r'^/deleteemployees?(?:@\w+)?\s*', message_text)
     if not command_match:
         return
 
@@ -328,15 +333,19 @@ async def deleteemployees_command(update: Update, context: ContextTypes.DEFAULT_
     error_list = []
 
     for line in lines:
-        name = line.strip()
+        name = re.sub(r'\s+', ' ', line).strip()
         if not name:
             continue
         
-        success = delete_employee(name)
-        if success:
-            success_list.append(f"• <b>{name}</b>")
-        else:
-            error_list.append(f"• <code>{name}</code> (Not found)")
+        try:
+            success = delete_employee(name)
+            if success:
+                success_list.append(f"• <b>{name}</b>")
+            else:
+                error_list.append(f"• <code>{name}</code> (Not found)")
+        except Exception as e:
+            logger.error(f"Database error deleting employee {name}: {e}")
+            error_list.append(f"• <code>{name}</code> (Database error: {e})")
 
     response_text = ""
     if success_list:
@@ -931,11 +940,15 @@ async def setexchange_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_html("⚠️ Error: Exchange rate must be a positive number.")
         return
 
-    set_exchange_rate(rate)
-    await update.message.reply_html(
-        f"✅ <b>បានកែប្រែអត្រាប្តូរប្រាក់ជោគជ័យ / Exchange rate updated successfully:</b>\n"
-        f"1$ = <b>{rate:,.0f}៛</b>"
-    )
+    try:
+        set_exchange_rate(rate)
+        await update.message.reply_html(
+            f"✅ <b>បានកែប្រែអត្រាប្តូរប្រាក់ជោគជ័យ / Exchange rate updated successfully:</b>\n"
+            f"1$ = <b>{rate:,.0f}៛</b>"
+        )
+    except Exception as e:
+        logger.error(f"Database error setting exchange rate: {e}")
+        await update.message.reply_html(f"⚠️ Database error: {e}")
 
 @restricted
 async def restartcount_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1123,9 +1136,13 @@ def main():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("addemployees", addemployees_command))
+    app.add_handler(CommandHandler("addemployee", addemployees_command))
     app.add_handler(CommandHandler("updateemployee", updateemployee_command))
+    app.add_handler(CommandHandler("updateemployees", updateemployee_command))
     app.add_handler(CommandHandler("deleteemployees", deleteemployees_command))
+    app.add_handler(CommandHandler("deleteemployee", deleteemployees_command))
     app.add_handler(CommandHandler("employees", employees_command))
+    app.add_handler(CommandHandler("employee", employees_command))
     app.add_handler(CommandHandler("setexchange", setexchange_command))
     app.add_handler(CommandHandler("restartcount", restartcount_command))
     app.add_handler(CommandHandler("borrow", borrow_command))

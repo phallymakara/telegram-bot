@@ -3,9 +3,9 @@ import re
 def parse_report_line(line: str) -> dict:
     """
     Parses a single line of the report.
-    Expected format: <index>. <name> <hours>h <note>?
-    Example: "1. ប៉ែន ទិត្យ.   8 h MEP" -> index=1, name="ប៉ែន ទិត្យ", hours=8.0, note="MEP"
-    Example: "2. អៀម អេន.    8.9 h" -> index=2, name="អៀម អេន", hours=8.9, note=None
+    Expected format: <index>. <name> [ <hours>h - <note>? ]
+    Example: "1. ប៉ែន ទិត្យ.      [ 0 h ]" -> index=1, name="ប៉ែន ទិត្យ", hours=8.0, note=None
+    Example: "2. អៀម អេន.       [ 2 h - villa ]" -> index=2, name="អៀម អេន", hours=10.0, note="villa"
     """
     # 1. Match the starting index: e.g., "1." or "1"
     index_match = re.match(r'^\s*(\d+)[\.\s]*', line)
@@ -15,8 +15,9 @@ def parse_report_line(line: str) -> dict:
     index_str = index_match.group(1)
     remaining = line[index_match.end():].strip()
     
-    # 2. Search for the hours: a float/int followed by optional space and 'h' or 'H'
-    hours_match = re.search(r'(\d+(?:\.\d+)?)\s*[hH](?:\s+|$)(.*)', remaining)
+    # 2. Search for the hours: match bracket format [ 0 h ] or old format 8 h
+    # Supports optional '[', optional spaces, number, optional spaces, h/H, optional spaces, optional ']'
+    hours_match = re.search(r'\[?\s*(\d+(?:\.\d+)?)\s*[hH]\s*\]?(?:\s*-\s*|\s+|$)(.*)', remaining)
     if not hours_match:
         return None
     
@@ -24,23 +25,32 @@ def parse_report_line(line: str) -> dict:
     note_str = hours_match.group(2).strip() if hours_match.group(2) else None
     
     if note_str:
-        note_str = re.sub(r'^\s*[,，;\.\s\-\/៖:]+', '', note_str)
-        note_str = re.sub(r'[,，;\.\s\-\/៖:]+$', '', note_str).strip()
+        # Clean leading and trailing brackets/punctuation/spaces
+        note_str = re.sub(r'^\s*[,，;\.\s\-\/៖:\[\]]+', '', note_str)
+        note_str = re.sub(r'[,，;\.\s\-\/៖:\[\]]+$', '', note_str).strip()
         if not note_str:
             note_str = None
             
     # The part before the hours is the employee's name
     name_part = remaining[:hours_match.start()].strip()
     
-    # Clean the name of trailing dots/punctuation/spaces/colons
-    name = re.sub(r'[:៖\.\s、，,]+$', '', name_part).strip()
+    # Clean the name of trailing dots/punctuation/spaces/colons/brackets
+    name = re.sub(r'[:៖\.\s、，,\[\]]+$', '', name_part).strip()
+    # Normalize internal consecutive whitespace to a single space
+    name = re.sub(r'\s+', ' ', name)
     if not name:
         return None
+        
+    raw_hours = float(hours_str)
+    # The new input format:
+    # 0 h -> means standard day (8.0 hours)
+    # H h (H > 0) -> means standard day + H extra hours (8.0 + H hours)
+    hours = 8.0 + raw_hours
         
     return {
         'index': int(index_str),
         'name': name,
-        'hours': float(hours_str),
+        'hours': hours,
         'note': note_str
     }
 

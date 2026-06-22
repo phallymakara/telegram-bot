@@ -104,6 +104,7 @@ def set_exchange_rate(rate: float):
 
 # Utility functions
 def add_employee(name: str, daily_rate: float, gender: str = None) -> bool:
+    name = re.sub(r'\s+', ' ', name).strip()
     db = SessionLocal()
     try:
         employee = db.query(Employee).filter(Employee.name == name).first()
@@ -138,6 +139,8 @@ def add_employee(name: str, daily_rate: float, gender: str = None) -> bool:
         db.close()
 
 def update_employee_name(old_name: str, new_name: str) -> bool:
+    old_name = re.sub(r'\s+', ' ', old_name).strip()
+    new_name = re.sub(r'\s+', ' ', new_name).strip()
     db = SessionLocal()
     try:
         employee = db.query(Employee).filter(Employee.name == old_name).first()
@@ -163,6 +166,7 @@ def update_employee_name(old_name: str, new_name: str) -> bool:
         db.close()
 
 def delete_employee(name: str) -> bool:
+    name = re.sub(r'\s+', ' ', name).strip()
     db = SessionLocal()
     try:
         employee = db.query(Employee).filter(Employee.name == name).first()
@@ -194,6 +198,7 @@ def restart_attendance_count() -> bool:
         db.close()
 
 def get_employee_rate(name: str) -> float:
+    name = re.sub(r'\s+', ' ', name).strip()
     db = SessionLocal()
     try:
         employee = db.query(Employee).filter(Employee.name == name).first()
@@ -444,12 +449,7 @@ def get_reports_by_dates(start_date_str: str = None, end_date_str: str = None) -
         db.close()
 
 def record_borrow(employee_name: str, borrow_amount: float, deduction_amount: float) -> tuple[bool, str, str]:
-    """
-    Records a borrow for an employee.
-    Finds today's report (or fallback to the most recent report).
-    Clears any prior borrow/deduct annotations and adds the new ones.
-    Returns (success, status_message, report_date).
-    """
+    employee_name = re.sub(r'\s+', ' ', employee_name).strip()
     db = SessionLocal()
     try:
         # Check if employee is registered in system (case-insensitive fallback)
