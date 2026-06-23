@@ -93,10 +93,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "👋 <b>សូមស្វាគមន៍មកកាន់ Telegram Bot គណនាវត្តមាន និងប្រាក់ឈ្នួល (Hourly Rate)!</b>\n"
         "<b>Welcome to Daily Attendance & Salary Bot!</b>\n\n"
-        "ផ្ញើបញ្ជីឈ្មោះបុគ្គលិកប្រចាំថ្ងៃមកខ្ញុំ ដើម្បីគណនាម៉ោងការងារ និងប្រាក់ឈ្នួលសរុប។\n"
-        "Send me your daily worker list to calculate working hours and salaries automatically.\n\n"
-        "ℹ️ ផ្ញើ /help ដើម្បីមើលរបៀបប្រើប្រាស់ និងការគ្រប់គ្រងបុគ្គលិក។\n"
-        "ℹ️ Send /help to see usage and employee management commands."
     )
     await update.message.reply_html(welcome_text)
 
@@ -156,10 +152,11 @@ async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYP
     content = message_text[command_match.end():].strip()
     if not content:
         await update.message.reply_html(
-            "⚠️ Usage:\n"
+            "⚠️ <b>ចម្លងគំរូខាងក្រោម រួចកែសម្រួលដើម្បីចុះឈ្មោះបុគ្គលិក៖</b>\n"
+            "<b>Copy and edit the template below to register employees:</b>\n\n"
             "<code>/addemployees\n"
-            "ប៉ែន ទិត្យ ប 80000\n"
-            "អៀម អេន ស 64000</code>"
+            "ឈ្មោះបុគ្គលិក ប 80000\n"
+            "ឈ្មោះបុគ្គលិក ស 65000</code>"
         )
         return
 
@@ -225,10 +222,11 @@ async def updateemployee_command(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     command_args = message_text[command_match.end():].strip()
-    if "->" not in command_args:
+    if not command_args or "->" not in command_args:
         await update.message.reply_html(
-            "⚠️ Usage: <code>/updateemployee &lt;old_name&gt; -&gt; &lt;new_name&gt;</code>\n"
-            "Example: <code>/updateemployee ប៉ែន ទិត្យ -&gt; ប៉ែន ទិត្យថ្មី</code>"
+            "⚠️ <b>ចម្លងគំរូខាងក្រោម រួចកែសម្រួលដើម្បីប្ដូរឈ្មោះបុគ្គលិក៖</b>\n"
+            "<b>Copy and edit the template below to rename an employee:</b>\n\n"
+            "<code>/updateemployee ឈ្មោះចាស់ -> ឈ្មោះថ្មី</code>"
         )
         return
 
@@ -259,8 +257,9 @@ async def borrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if len(args) < 2:
         await update.message.reply_html(
-            "⚠️ Usage: <code>/borrow &lt;employee_name&gt; &lt;amount&gt;</code>\n"
-            "Example: <code>/borrow ប៉ែន ទិត្យ 250000</code>"
+            "⚠️ <b>ចម្លងគំរូខាងក្រោម រួចកែសម្រួលដើម្បីកត់ត្រាការខ្ចីលុយ៖</b>\n"
+            "<b>Copy and edit the template below to record borrow:</b>\n\n"
+            "<code>/borrow ឈ្មោះបុគ្គលិក 250000</code>"
         )
         return
 
@@ -321,10 +320,10 @@ async def deleteemployees_command(update: Update, context: ContextTypes.DEFAULT_
     content = message_text[command_match.end():].strip()
     if not content:
         await update.message.reply_html(
-            "⚠️ Usage:\n"
+            "⚠️ <b>ចម្លងគំរូខាងក្រោម រួចកែសម្រួលដើម្បីលុបឈ្មោះបុគ្គលិក៖</b>\n"
+            "<b>Copy and edit the template below to delete employees:</b>\n\n"
             "<code>/deleteemployees\n"
-            "ប៉ែន ទិត្យ\n"
-            "អៀម អេន</code>"
+            "ឈ្មោះបុគ្គលិក</code>"
         )
         return
 
@@ -417,6 +416,32 @@ def parse_header_date_time(header: str):
         time_part = match.group(2).strip() if match.group(2) else None
         return date_part, time_part
     return header.strip(), None
+
+@restricted
+async def template_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    employees = get_all_employees()
+    if not employees:
+        await update.message.reply_html(
+            "ℹ️ មិនទាន់មានបុគ្គលិកចុះឈ្មោះនៅឡើយទេ។ សូមចុះឈ្មោះបុគ្គលិកដោយប្រើ /addemployees\n"
+            "No employees registered yet. Register employees using <code>/addemployees</code>."
+        )
+        return
+
+    # Cambodia Timezone (UTC+7)
+    from datetime import datetime, timezone, timedelta
+    tz_kh = timezone(timedelta(hours=7))
+    today_str = datetime.now(tz_kh).strftime("%d.%m.%y") # e.g. 23.06.26
+
+    template_text = f"ថ្ងៃទី: {today_str} (7:00am - 5:00pm)\n"
+    for idx, name in enumerate(employees.keys(), 1):
+        template_text += f"{idx}. {name}.      [ 0 h ]\n"
+
+    reply_text = (
+        "📋 <b>សូមចម្លងបញ្ជីខាងក្រោម រួចកែសម្រួលវត្តមានបុគ្គលិក៖</b>\n"
+        "<b>Copy and edit the attendance list below:</b>\n\n"
+        f"<code>{template_text}</code>"
+    )
+    await update.message.reply_html(reply_text)
 
 @restricted
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -927,8 +952,9 @@ async def setexchange_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         current_rate = get_exchange_rate()
         await update.message.reply_html(
             f"💵 <b>អត្រាប្តូរប្រាក់បច្ចុប្បន្ន / Current Exchange Rate:</b> 1$ = <b>{current_rate:,.0f}៛</b>\n\n"
-            "Usage: <code>/setexchange &lt;rate&gt;</code>\n"
-            "Example: <code>/setexchange 4100</code>"
+            "⚠️ <b>ចម្លងគំរូខាងក្រោម រួចកែសម្រួលដើម្បីប្ដូរអត្រាប្តូរប្រាក់៖</b>\n"
+            "<b>Copy and edit the template below to update exchange rate:</b>\n\n"
+            "<code>/setexchange 4100</code>"
         )
         return
 
@@ -1085,7 +1111,8 @@ async def post_init(application: Application) -> None:
     try:
         await application.bot.set_my_commands([
             BotCommand("start", "Start the bot / ផ្ដើមដំណើរការ"),
-            BotCommand("help", "Show help and templates / បង្ហាញជំនួយ"),
+            BotCommand("help", "Show help / បង្ហាញជំនួយ"),
+            BotCommand("template", "Get attendance template / ទាញយកគំរូវត្តមាន"),
             BotCommand("addemployees", "Add multiple employees / បន្ថែមឈ្មោះបុគ្គលិកច្រើន"),
             BotCommand("updateemployee", "Rename employee / កែប្រែឈ្មោះបុគ្គលិក"),
             BotCommand("deleteemployees", "Delete multiple employees / លុបឈ្មោះបុគ្គលិកច្រើន"),
@@ -1135,6 +1162,8 @@ def main():
     # Add Command Handlers
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("template", template_command))
+    app.add_handler(CommandHandler("input", template_command))
     app.add_handler(CommandHandler("addemployees", addemployees_command))
     app.add_handler(CommandHandler("addemployee", addemployees_command))
     app.add_handler(CommandHandler("updateemployee", updateemployee_command))
