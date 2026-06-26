@@ -7,6 +7,7 @@ from app.config import BOT_TOKEN
 from app.database.repository import init_db
 from app.handlers.exchange import setexchange_command
 from app.handlers.borrow import borrow_command
+from app.handlers.reports import report_excel_command, report_pdf_command
 from app.handlers.attendance import (
     handle_attendance_message,
     template_command,
@@ -39,6 +40,8 @@ async def post_init(application: Application) -> None:
                 BotCommand("deleteemployees", "Delete employees"),
                 BotCommand("setexchange", "Set exchange rate"),
                 BotCommand("borrow", "Record employee borrow amount"),
+                BotCommand("report_pdf", "Export report as PDF"),
+                BotCommand("report_excel", "Export report as Excel"),
             ]
         )
         logger.info("Successfully set bot commands.")
@@ -86,6 +89,10 @@ def main():
 
     # Borrow command
     app.add_handler(CommandHandler("borrow", borrow_command))
+
+    # Report commands
+    app.add_handler(CommandHandler("report_pdf", report_pdf_command))
+    app.add_handler(CommandHandler("report_excel", report_excel_command))
 
     # Normal text attendance message
     # This should stay near the bottom, after command handlers.
