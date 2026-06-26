@@ -1,13 +1,14 @@
 import logging
 
 from telegram import BotCommand
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 from app.config import BOT_TOKEN
 from app.database.repository import init_db
 from app.handlers.exchange import setexchange_command
 from app.handlers.borrow import borrow_command
 from app.handlers.reports import report_excel_command, report_pdf_command
+from app.handlers.restart import restartcount_callback, restartcount_command
 from app.handlers.attendance import (
     handle_attendance_message,
     template_command,
@@ -42,6 +43,7 @@ async def post_init(application: Application) -> None:
                 BotCommand("borrow", "Record employee borrow amount"),
                 BotCommand("report_pdf", "Export report as PDF"),
                 BotCommand("report_excel", "Export report as Excel"),
+                BotCommand("restartcount", "Restart attendance count"),
             ]
         )
         logger.info("Successfully set bot commands.")
@@ -93,6 +95,9 @@ def main():
     # Report commands
     app.add_handler(CommandHandler("report_pdf", report_pdf_command))
     app.add_handler(CommandHandler("report_excel", report_excel_command))
+
+    # Restart count command
+    app.add_handler(CommandHandler("restartcount", restartcount_command))
 
     # Normal text attendance message
     # This should stay near the bottom, after command handlers.
