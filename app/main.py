@@ -1,10 +1,14 @@
 import logging
 
 from telegram import BotCommand
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from app.config import BOT_TOKEN
 from app.database.repository import init_db
+from app.handlers.attendance import (
+    handle_attendance_message,
+    template_command,
+)
 from app.handlers.employees import (
     addemployees_command,
     deleteemployees_command,
@@ -25,6 +29,8 @@ async def post_init(application: Application) -> None:
     try:
         await application.bot.set_my_commands(
             [
+                BotCommand("template", "Get attendance template"),
+                BotCommand("input", "Get attendance template"),
                 BotCommand("employees", "List all employees"),
                 BotCommand("addemployees", "Add employees"),
                 BotCommand("updateemployee", "Update employee name"),
@@ -54,6 +60,11 @@ def main():
         .build()
     )
 
+    # Attendance commands
+    app.add_handler(CommandHandler("template", template_command))
+    app.add_handler(CommandHandler("input", template_command))
+
+    # Employee commands
     app.add_handler(CommandHandler("employees", employees_command))
     app.add_handler(CommandHandler("employee", employees_command))
 
@@ -65,6 +76,15 @@ def main():
 
     app.add_handler(CommandHandler("deleteemployees", deleteemployees_command))
     app.add_handler(CommandHandler("deleteemployee", deleteemployees_command))
+
+    # Normal text attendance message
+    # This should stay near the bottom, after command handlers.
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            handle_attendance_message,
+        )
+    )
 
     logger.info("Starting Telegram bot from app/main.py...")
     app.run_polling()
