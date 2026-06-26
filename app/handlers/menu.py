@@ -160,13 +160,16 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "menu_exchange":
         current_rate = get_exchange_rate()
+        context.user_data["mode"] = "exchange"
 
         await query.edit_message_text(
             "💵 <b>អត្រាប្តូរប្រាក់ / Exchange Rate</b>\n\n"
             f"Current exchange rate:\n"
             f"1$ = <b>{current_rate:,.0f}៛</b>\n\n"
-            "To update, send:\n"
-            "<code>/setexchange 4100</code>",
+            "សូមផ្ញើអត្រាថ្មីដោយមិនចាំបាច់វាយ command។\n"
+            "Please send the new exchange rate without command.\n\n"
+            "Example:\n"
+            "<code>4100</code>",
             parse_mode="HTML",
             reply_markup=back_to_main_keyboard(),
         )
@@ -226,12 +229,17 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "employees_add":
+        context.user_data["mode"] = "add_employee"
+
         await query.edit_message_text(
             "➕ <b>បន្ថែមបុគ្គលិក / Add Employees</b>\n\n"
-            "Please send this format:\n\n"
-            "<code>/addemployees\n"
+            "សូមផ្ញើព័ត៌មានបុគ្គលិកដោយមិនចាំបាច់វាយ command។\n"
+            "Please send employee information without command.\n\n"
+            "Format:\n"
+            "<code>"
             "ប៉ែន ទិត្យ ប 80000\n"
-            "អៀម អេន ស 64000</code>\n\n"
+            "អៀម អេន ស 64000"
+            "</code>\n\n"
             "ប = Male\n"
             "ស = Female",
             parse_mode="HTML",
@@ -240,32 +248,45 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "employees_update":
+        context.user_data["mode"] = "update_employee"
+
         await query.edit_message_text(
             "✏️ <b>កែឈ្មោះបុគ្គលិក / Update Employee</b>\n\n"
-            "Please send this format:\n\n"
-            "<code>/updateemployee ឈ្មោះចាស់ -> ឈ្មោះថ្មី</code>",
+            "សូមផ្ញើឈ្មោះចាស់ និងឈ្មោះថ្មីដោយមិនចាំបាច់វាយ command។\n"
+            "Please send old name and new name without command.\n\n"
+            "Format:\n"
+            "<code>ឈ្មោះចាស់ -> ឈ្មោះថ្មី</code>",
             parse_mode="HTML",
             reply_markup=employees_menu_keyboard(),
         )
         return
 
     if data == "employees_delete":
+        context.user_data["mode"] = "delete_employee"
+
         await query.edit_message_text(
             "🗑️ <b>លុបបុគ្គលិក / Delete Employee</b>\n\n"
-            "Please send this format:\n\n"
-            "<code>/deleteemployees\n"
+            "សូមផ្ញើឈ្មោះបុគ្គលិកដែលចង់លុប ដោយមិនចាំបាច់វាយ command។\n"
+            "Please send employee names without command.\n\n"
+            "Format:\n"
+            "<code>"
             "ប៉ែន ទិត្យ\n"
-            "អៀម អេន</code>",
+            "អៀម អេន"
+            "</code>",
             parse_mode="HTML",
             reply_markup=employees_menu_keyboard(),
         )
         return
 
     if data == "employees_borrow":
+        context.user_data["mode"] = "borrow"
+
         await query.edit_message_text(
             "💸 <b>ខ្ចីលុយ / Borrow Money</b>\n\n"
-            "Please send this format:\n\n"
-            "<code>/borrow ប៉ែន ទិត្យ 250000</code>",
+            "សូមផ្ញើឈ្មោះបុគ្គលិក និងចំនួនលុយដោយមិនចាំបាច់វាយ command។\n"
+            "Please send employee name and amount without command.\n\n"
+            "Format:\n"
+            "<code>ប៉ែន ទិត្យ 250000</code>",
             parse_mode="HTML",
             reply_markup=employees_menu_keyboard(),
         )
@@ -286,22 +307,32 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "reports_pdf_date":
+        context.user_data["mode"] = "report_pdf_date"
+
         await query.edit_message_text(
             "📅 <b>PDF by Date</b>\n\n"
-            "Please send one of these formats:\n\n"
-            "<code>/report_pdf 26.06.26</code>\n"
-            "<code>/report_pdf 20.06.26 26.06.26</code>",
+            "សូមផ្ញើកាលបរិច្ឆេទដោយមិនចាំបាច់វាយ command។\n"
+            "Please send date without command.\n\n"
+            "One day:\n"
+            "<code>26.06.26</code>\n\n"
+            "Date range:\n"
+            "<code>20.06.26 26.06.26</code>",
             parse_mode="HTML",
             reply_markup=reports_menu_keyboard(),
         )
         return
 
     if data == "reports_excel_date":
+        context.user_data["mode"] = "report_excel_date"
+
         await query.edit_message_text(
             "📅 <b>Excel by Date</b>\n\n"
-            "Please send one of these formats:\n\n"
-            "<code>/report_excel 26.06.26</code>\n"
-            "<code>/report_excel 20.06.26 26.06.26</code>",
+            "សូមផ្ញើកាលបរិច្ឆេទដោយមិនចាំបាច់វាយ command។\n"
+            "Please send date without command.\n\n"
+            "One day:\n"
+            "<code>26.06.26</code>\n\n"
+            "Date range:\n"
+            "<code>20.06.26 26.06.26</code>",
             parse_mode="HTML",
             reply_markup=reports_menu_keyboard(),
         )

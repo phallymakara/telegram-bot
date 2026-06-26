@@ -12,7 +12,7 @@ from telegram.ext import (
 from app.config import BOT_TOKEN
 from app.database.repository import init_db
 
-from app.handlers.attendance import handle_attendance_message, template_command
+from app.handlers.attendance import template_command
 from app.handlers.borrow import borrow_command
 from app.handlers.employees import (
     addemployees_command,
@@ -24,6 +24,7 @@ from app.handlers.exchange import setexchange_command
 from app.handlers.menu import menu_callback, menu_command, main_menu_keyboard
 from app.handlers.reports import report_excel_command, report_pdf_command
 from app.handlers.restart import restartcount_callback, restartcount_command
+from app.handlers.input_router import handle_text_message
 
 
 logging.basicConfig(
@@ -143,7 +144,7 @@ def main():
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
-            handle_attendance_message,
+            handle_text_message,
         )
     )
 
