@@ -9,6 +9,7 @@ from app.handlers.exchange import setexchange_command
 from app.handlers.borrow import borrow_command
 from app.handlers.reports import report_excel_command, report_pdf_command
 from app.handlers.restart import restartcount_callback, restartcount_command
+from app.handlers.menu import menu_callback, menu_command
 from app.handlers.attendance import (
     handle_attendance_message,
     template_command,
@@ -44,6 +45,7 @@ async def post_init(application: Application) -> None:
                 BotCommand("report_pdf", "Export report as PDF"),
                 BotCommand("report_excel", "Export report as Excel"),
                 BotCommand("restartcount", "Restart attendance count"),
+                BotCommand("menu", "Show button menu"),
             ]
         )
         logger.info("Successfully set bot commands.")
@@ -68,6 +70,9 @@ def main():
         .pool_timeout(30.0)
         .build()
     )
+
+    # Menu command
+    app.add_handler(CommandHandler("menu", menu_command))
 
     # Attendance commands
     app.add_handler(CommandHandler("template", template_command))
@@ -99,13 +104,30 @@ def main():
     # Restart count command
     app.add_handler(CommandHandler("restartcount", restartcount_command))
 
+    
+    # Menu buttons
+    app.add_handler(
+        CallbackQueryHandler(
+            menu_callback,
+            pattern="^(menu_|attendance_|employees_|reports_|admin_)",
+        )
+    )
+
+    # Restart confirmation buttons
+    app.add_handler(
+        CallbackQueryHandler(
+            restartcount_callback,
+            pattern="^(confirm_restart|cancel_restart)$",
+        )
+    )
+    
     # Normal text attendance message
     # This should stay near the bottom, after command handlers.
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             handle_attendance_message,
-        )
+        ),
     )
 
     logger.info("Starting Telegram bot from app/main.py...")
