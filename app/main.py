@@ -6,6 +6,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from app.config import BOT_TOKEN
 from app.database.repository import init_db
 from app.handlers.exchange import setexchange_command
+from app.handlers.borrow import borrow_command
 from app.handlers.attendance import (
     handle_attendance_message,
     template_command,
@@ -37,6 +38,7 @@ async def post_init(application: Application) -> None:
                 BotCommand("updateemployee", "Update employee name"),
                 BotCommand("deleteemployees", "Delete employees"),
                 BotCommand("setexchange", "Set exchange rate"),
+                BotCommand("borrow", "Record employee borrow amount"),
             ]
         )
         logger.info("Successfully set bot commands.")
@@ -81,6 +83,9 @@ def main():
 
     # Exchange Command
     app.add_handler(CommandHandler("setexchange", setexchange_command))
+
+    # Borrow command
+    app.add_handler(CommandHandler("borrow", borrow_command))
 
     # Normal text attendance message
     # This should stay near the bottom, after command handlers.
