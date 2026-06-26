@@ -10,16 +10,19 @@ def main_menu_keyboard():
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📝 វត្តមាន / Attendance", callback_data="menu_attendance"),
-                InlineKeyboardButton("👥 បុគ្គលិក / Employees", callback_data="menu_employees"),
+                InlineKeyboardButton("Attendance", callback_data="menu_attendance"),
+                InlineKeyboardButton("Employees", callback_data="menu_employees"),
             ],
             [
-                InlineKeyboardButton("📊 របាយការណ៍ / Reports", callback_data="menu_reports"),
-                InlineKeyboardButton("💵 អត្រាប្តូរប្រាក់ / Exchange", callback_data="menu_exchange"),
+                InlineKeyboardButton("Borrow", callback_data="employees_borrow"),
+                InlineKeyboardButton("Reports", callback_data="menu_reports"),
             ],
             [
-                InlineKeyboardButton("⚙️ Admin", callback_data="menu_admin"),
-                InlineKeyboardButton("❓ ជំនួយ / Help", callback_data="menu_help"),
+                InlineKeyboardButton("Exchange", callback_data="menu_exchange"),
+                InlineKeyboardButton("Admin", callback_data="menu_admin"),
+            ],
+            [
+                InlineKeyboardButton("Help", callback_data="menu_help"),
             ],
         ]
     )
@@ -29,7 +32,19 @@ def back_to_main_keyboard():
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🔙 ត្រឡប់ទៅម៉ឺនុយមេ / Back to Main Menu", callback_data="menu_main")
+                InlineKeyboardButton("Back", callback_data="menu_main")
+            ]
+        ]
+    )
+
+def back_to_employee_keyboard():
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    "Back",
+                    callback_data="menu_employees",
+                )
             ]
         ]
     )
@@ -39,13 +54,13 @@ def attendance_menu_keyboard():
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📋 ទាញយកគំរូ / Get Template", callback_data="attendance_template"),
+                InlineKeyboardButton("Get Template", callback_data="attendance_template"),
             ],
             [
-                InlineKeyboardButton("✍️ របៀបបញ្ចូលវត្តមាន / Submit Guide", callback_data="attendance_guide"),
+                InlineKeyboardButton("Submit Attendance", callback_data="attendance_submit"),
             ],
             [
-                InlineKeyboardButton("🔙 ត្រឡប់ក្រោយ / Back", callback_data="menu_main"),
+                InlineKeyboardButton("Back", callback_data="menu_main"),
             ],
         ]
     )
@@ -55,18 +70,17 @@ def employees_menu_keyboard():
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📋 បញ្ជីបុគ្គលិក / Employee List", callback_data="employees_list"),
+                InlineKeyboardButton("Employee List", callback_data="employees_list"),
             ],
             [
-                InlineKeyboardButton("➕ បន្ថែម / Add", callback_data="employees_add"),
-                InlineKeyboardButton("✏️ កែឈ្មោះ / Update", callback_data="employees_update"),
+                InlineKeyboardButton("Add Employee", callback_data="employees_add"),
+                InlineKeyboardButton("Update Employee", callback_data="employees_update"),
             ],
             [
-                InlineKeyboardButton("🗑️ លុប / Delete", callback_data="employees_delete"),
-                InlineKeyboardButton("💸 ខ្ចីលុយ / Borrow", callback_data="employees_borrow"),
+                InlineKeyboardButton("Delete Employee", callback_data="employees_delete"),
             ],
             [
-                InlineKeyboardButton("🔙 ត្រឡប់ក្រោយ / Back", callback_data="menu_main"),
+                InlineKeyboardButton("Back", callback_data="menu_main"),
             ],
         ]
     )
@@ -76,15 +90,15 @@ def reports_menu_keyboard():
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📄 PDF ទាំងអស់ / All PDF", callback_data="reports_pdf_all"),
-                InlineKeyboardButton("📊 Excel ទាំងអស់ / All Excel", callback_data="reports_excel_all"),
+                InlineKeyboardButton("PDF", callback_data="reports_pdf_all"),
+                InlineKeyboardButton("Excel", callback_data="reports_excel_all"),
             ],
             [
-                InlineKeyboardButton("📅 PDF តាមថ្ងៃ / PDF by Date", callback_data="reports_pdf_date"),
-                InlineKeyboardButton("📅 Excel តាមថ្ងៃ / Excel by Date", callback_data="reports_excel_date"),
+                InlineKeyboardButton("PDF by Date", callback_data="reports_pdf_date"),
+                InlineKeyboardButton("Excel by Date", callback_data="reports_excel_date"),
             ],
             [
-                InlineKeyboardButton("🔙 ត្រឡប់ក្រោយ / Back", callback_data="menu_main"),
+                InlineKeyboardButton("Back", callback_data="menu_main"),
             ],
         ]
     )
@@ -94,10 +108,10 @@ def admin_menu_keyboard():
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🔄 Restart Count", callback_data="admin_restart"),
+                InlineKeyboardButton("Restart Count", callback_data="admin_restart"),
             ],
             [
-                InlineKeyboardButton("🔙 ត្រឡប់ក្រោយ / Back", callback_data="menu_main"),
+                InlineKeyboardButton("Back", callback_data="menu_main"),
             ],
         ]
     )
@@ -119,6 +133,8 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data == "menu_main":
+        context.user_data.pop("mode", None)
+
         await query.edit_message_text(
             "🏠 <b>ម៉ឺនុយមេ / Main Menu</b>\n\n"
             "សូមជ្រើសរើសមុខងារខាងក្រោម៖\n"
@@ -207,19 +223,25 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if data == "attendance_guide":
+    if data == "attendance_submit":
+        context.user_data["mode"] = "attendance"
+
         await query.edit_message_text(
-            "✍️ <b>របៀបបញ្ចូលវត្តមាន / Submit Attendance Guide</b>\n\n"
-            "Copy the template, edit the hours, then send it back to the bot.\n\n"
-            "<code>"
-            "ថ្ងៃទី: 26.06.26 (7:00am - 5:00pm)\n"
-            "1. ប៉ែន ទិត្យ. [ 0 h ]\n"
-            "2. អៀម អេន. [ 2 h ]\n"
-            "</code>\n\n"
-            "[ 0 h ] = normal 8 hours\n"
-            "[ 2 h ] = 8 hours + 2 overtime hours",
+            text=(
+                "✅ <b>Submit Attendance</b>\n\n"
+                "សូមផ្ញើបញ្ជីវត្តមាន។\n"
+                "Please input the attendance list.\n\n"
+                "<b>Example:</b>\n"
+                "<code>"
+                "ថ្ងៃទី: 26.06.26 (7:00am - 5:00pm)\n"
+                "1. ប៉ែន ទិត្យ. [ 0 h ]\n"
+                "2. អៀម អេន. [ 2 h ]"
+                "</code>\n\n"
+                "[ 0 h ] = normal 8 hours\n"
+                "[ 2 h ] = 8 hours + 2 overtime hours"
+            ),
             parse_mode="HTML",
-            reply_markup=attendance_menu_keyboard(),
+            reply_markup=back_to_main_keyboard(),
         )
         return
 
@@ -243,7 +265,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "ប = Male\n"
             "ស = Female",
             parse_mode="HTML",
-            reply_markup=employees_menu_keyboard(),
+            reply_markup=back_to_employee_keyboard(),
         )
         return
 
@@ -257,7 +279,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Format:\n"
             "<code>ឈ្មោះចាស់ -> ឈ្មោះថ្មី</code>",
             parse_mode="HTML",
-            reply_markup=employees_menu_keyboard(),
+            reply_markup=back_to_employee_keyboard(),
         )
         return
 
@@ -274,7 +296,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "អៀម អេន"
             "</code>",
             parse_mode="HTML",
-            reply_markup=employees_menu_keyboard(),
+            reply_markup=back_to_employee_keyboard(),
         )
         return
 
@@ -282,13 +304,12 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["mode"] = "borrow"
 
         await query.edit_message_text(
-            "💸 <b>ខ្ចីលុយ / Borrow Money</b>\n\n"
-            "សូមផ្ញើឈ្មោះបុគ្គលិក និងចំនួនលុយដោយមិនចាំបាច់វាយ command។\n"
-            "Please send employee name and amount without command.\n\n"
-            "Format:\n"
+            "💸 Borrow Money \n\n"
+            "បញ្ចូលឈ្មោះបុគ្គលិក និងចំនួនលុយដែលខ្ចី។\n"
+            "Example:\n"
             "<code>ប៉ែន ទិត្យ 250000</code>",
             parse_mode="HTML",
-            reply_markup=employees_menu_keyboard(),
+            reply_markup=back_to_main_keyboard(),
         )
         return
 

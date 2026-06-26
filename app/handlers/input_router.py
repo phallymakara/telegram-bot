@@ -3,6 +3,8 @@ import os
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from app.handlers.menu import main_menu_keyboard
+
 from app.database.repository import (
     get_exchange_rate,
     record_borrow,
@@ -26,6 +28,14 @@ from app.services.salary import calculate_borrow_deduction, calculate_debt
 
 def clear_mode(context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("mode", None)
+
+
+async def show_main_menu(update: Update):
+    await update.message.reply_text(
+        "Main Menu\n\n"
+        "Please choose the next action:",
+        reply_markup=main_menu_keyboard(),
+    )
 
 
 async def handle_add_employee_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -53,6 +63,7 @@ async def handle_add_employee_input(update: Update, context: ContextTypes.DEFAUL
         "<b>Skipped / Errors:</b>\n"
         f"{error_text}"
     )
+    await show_main_menu(update)
 
 
 async def handle_update_employee_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -78,6 +89,7 @@ async def handle_update_employee_input(update: Update, context: ContextTypes.DEF
         await update.message.reply_html(f"✅ {message}")
     else:
         await update.message.reply_html(f"⚠️ {message}")
+    await show_main_menu(update)
 
 
 async def handle_delete_employee_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -93,6 +105,7 @@ async def handle_delete_employee_input(update: Update, context: ContextTypes.DEF
         f"Not found: <b>{result['not_found']}</b>\n\n"
         f"{result['message']}"
     )
+    await show_main_menu(update)
 
 
 async def handle_exchange_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -121,6 +134,7 @@ async def handle_exchange_input(update: Update, context: ContextTypes.DEFAULT_TY
         "✅ <b>Exchange rate updated successfully.</b>\n\n"
         f"1$ = <b>{rate:,.0f}៛</b>"
     )
+    await show_main_menu(update)
 
 
 async def handle_borrow_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -188,6 +202,7 @@ async def handle_borrow_input(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"✂️ Deduction: <b>{int(deduction):,}៛</b>\n"
         f"🔴 Debt: <b>{int(debt):,}៛</b>"
     )
+    await show_main_menu(update)
 
 
 async def send_report_file(
@@ -217,6 +232,8 @@ async def send_report_file(
         await update.message.reply_html(
             "⚠️ <b>No report data found for this period.</b>"
         )
+
+        await show_main_menu(update)
         return
 
     status_message = await update.message.reply_html(
@@ -253,6 +270,8 @@ async def send_report_file(
         except Exception:
             pass
 
+        await show_main_menu(update)
+
     except Exception as error:
         await update.message.reply_html(
             f"⚠️ <b>Error generating report:</b>\n{error}"
@@ -266,26 +285,12 @@ async def send_report_file(
                 pass
 
 
-async def handle_report_date_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    mode = context.user_data.get("mode")
-    text = update.message.text.strip()
-    args = text.split()
-
-    if mode == "report_pdf_date":
-        await send_report_file(update, context, "pdf", args)
-        return
-
-    if mode == "report_excel_date":
-        await send_report_file(update, context, "excel", args)
-        return
-
-
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Main text router.
 
-    If user clicked a button first, process the text based on selected mode.
-    If no mode is selected, treat text as attendance input.
+    Text input only works after user clicks a button.
+    Attendance will only be recorded after clicking Submit Attendance.
     """
     mode = context.user_data.get("mode")
 
@@ -313,5 +318,22 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await handle_report_date_input(update, context)
         return
 
-    # Default behavior: normal text is attendance input.
-    await handle_attendance_message(update, context)
+    if mode == "attendance":
+        await handle_attendance_message(update, context)
+
+        # Important:
+        # after one attendance input, stop waiting.
+        # User must click Submit Attendance again for next report.
+        clear_mode(context)
+
+        await show_main_menu(update)
+        return
+
+    # No mode selected:
+    # Do not record attendance automatically.
+    await update.message.reply_text(
+        "សូមចុចប៊ូតុង Submit Attendance មុនពេលផ្ញើវត្តមាន។\n"
+        "Please click Submit Attendance before sending attendance."
+    )
+
+    await show_main_menu(update)
