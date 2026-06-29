@@ -18,7 +18,6 @@ async def template_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     template_text = build_attendance_template()
 
     await update.message.reply_html(
-        "📋 <b>សូមចម្លងបញ្ជីខាងក្រោម រួចកែសម្រួលវត្តមានបុគ្គលិក៖</b>\n"
         "<b>Copy and edit the attendance list below:</b>\n\n"
         f"<code>{template_text}</code>"
     )
@@ -38,10 +37,7 @@ async def handle_attendance_message(update: Update, context: ContextTypes.DEFAUL
     if not day_blocks:
         if update.message.chat.type == "private":
             await update.message.reply_html(
-                "<b>សុំទោស ខ្ញុំមិនយល់ពីទម្រង់ទិន្នន័យនេះទេ។</b>\n"
                 "Sorry, I couldn't parse the format of your message.\n\n"
-                "សូមផ្ញើជាបញ្ជីវត្តមាន ឬវាយ /template ដើម្បីយកគំរូ។\n"
-                "Please send the attendance list or type /template to get the template."
             )
         return
 

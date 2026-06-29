@@ -16,10 +16,9 @@ async def setexchange_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         current_rate = get_exchange_rate()
 
         await update.message.reply_html(
-            f"💵 <b>អត្រាប្តូរប្រាក់បច្ចុប្បន្ន / Current Exchange Rate:</b>\n"
+            f"<b>Current Exchange Rate:</b>\n"
             f"1$ = <b>{current_rate:,.0f}៛</b>\n\n"
-            "សូមបញ្ចូលអត្រាថ្មីតាមទម្រង់ខាងក្រោម៖\n"
-            "Please enter new exchange rate using this format:\n\n"
+            "enter new exchange rate:\n\n"
             "<code>/setexchange 4100</code>"
         )
         return
@@ -32,7 +31,7 @@ async def setexchange_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     except ValueError:
         await update.message.reply_html(
-            "⚠️ <b>Error:</b> Exchange rate must be a positive number.\n\n"
+            "⚠️ <b>Error:</b> Exchange rate must positive number.\n\n"
             "Example:\n"
             "<code>/setexchange 4100</code>"
         )
@@ -42,7 +41,7 @@ async def setexchange_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         set_exchange_rate(rate)
 
         await update.message.reply_html(
-            "✅ <b>បានកែប្រែអត្រាប្តូរប្រាក់ជោគជ័យ / Exchange rate updated successfully:</b>\n"
+            "✅ Exchange rate updated successfully:</b>\n"
             f"1$ = <b>{rate:,.0f}៛</b>"
         )
 

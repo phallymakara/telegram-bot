@@ -55,12 +55,12 @@ async def handle_add_employee_input(update: Update, context: ContextTypes.DEFAUL
     error_text = "\n".join(error_items) if error_items else "None"
 
     await update.message.reply_html(
-        "✅ <b>Employee Add Result</b>\n\n"
+        "✅ <b>Result</b>\n\n"
         f"Added: <b>{added_count}</b>\n"
-        f"Skipped: <b>{skipped_count}</b>\n\n"
+        f"Wrong: <b>{skipped_count}</b>\n\n"
         "<b>Added Employees:</b>\n"
         f"{success_text}\n\n"
-        "<b>Skipped / Errors:</b>\n"
+        "<b>Wrong / Errors:</b>\n"
         f"{error_text}"
     )
     await show_main_menu(update)
@@ -186,21 +186,21 @@ async def handle_borrow_input(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if amount == 0:
         await update.message.reply_html(
-            "✅ <b>Borrow cleared successfully.</b>\n\n"
-            f"👤 Employee: <b>{registered_name}</b>\n"
-            f"📅 Date: <b>{report_day}</b>"
+            "<b>Borrow cleared successfully.</b>\n\n"
+            f"Employee: <b>{registered_name}</b>\n"
+            f"Date: <b>{report_day}</b>"
         )
         return
 
     debt = calculate_debt(amount, deduction)
 
     await update.message.reply_html(
-        "✅ <b>Borrow recorded successfully.</b>\n\n"
-        f"👤 Employee: <b>{registered_name}</b>\n"
-        f"📅 Date: <b>{report_day}</b>\n"
-        f"💵 Borrow Amount: <b>{int(amount):,}៛</b>\n"
-        f"✂️ Deduction: <b>{int(deduction):,}៛</b>\n"
-        f"🔴 Debt: <b>{int(debt):,}៛</b>"
+        "<b>Borrow recorded successfully.</b>\n\n"
+        f"Employee: <b>{registered_name}</b>\n"
+        f"Date: <b>{report_day}</b>\n"
+        f"Borrow Amount: <b>{int(amount):,}៛</b>\n"
+        f"Deduction: <b>{int(deduction):,}៛</b>\n"
+        f"Debt: <b>{int(debt):,}៛</b>"
     )
     await show_main_menu(update)
 
@@ -283,6 +283,14 @@ async def send_report_file(
                 os.remove(file_path)
             except Exception:
                 pass
+
+
+async def handle_report_date_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    args = text.split()
+    mode = context.user_data.get("mode")
+    report_type = "excel" if mode == "report_excel_date" else "pdf"
+    await send_report_file(update, context, report_type, args)
 
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):

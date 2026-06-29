@@ -19,7 +19,6 @@ async def borrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if len(args) < 2:
         await update.message.reply_html(
-            "⚠️ <b>ចម្លងគំរូខាងក្រោម រួចកែសម្រួលដើម្បីកត់ត្រាការខ្ចីលុយ៖</b>\n"
             "<b>Copy and edit the template below to record borrow:</b>\n\n"
             "<code>/borrow ឈ្មោះបុគ្គលិក 250000</code>"
         )
@@ -60,18 +59,18 @@ async def borrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if amount == 0:
         await update.message.reply_html(
             "✅ <b>បានលុបការខ្ចីប្រាក់របស់បុគ្គលិក / Borrow Cleared:</b>\n\n"
-            f"👤 <b>បុគ្គលិក / Employee:</b> <b>{registered_name}</b>\n"
-            f"📅 <b>ថ្ងៃទី / Date:</b> <b>{report_day}</b>"
+            f"👤 <b>បុគ្គលិក:</b> <b>{registered_name}</b>\n"
+            f"📅 <b>ថ្ងៃទី:</b> <b>{report_day}</b>"
         )
         return
 
     debt = calculate_debt(amount, deduction)
 
     await update.message.reply_html(
-        "✅ <b>កត់ត្រាការខ្ចីប្រាក់ជោគជ័យ / Borrow Recorded:</b>\n\n"
-        f"👤 <b>បុគ្គលិក / Employee:</b> <b>{registered_name}</b>\n"
-        f"📅 <b>ថ្ងៃទី / Date:</b> <b>{report_day}</b>\n"
-        f"💵 <b>ខ្ចីលុយ / Borrow Amount:</b> <b>{int(amount):,}៛</b>\n"
-        f"✂️ <b>ប្រាក់កាត់ / Deduction:</b> <b>{int(deduction):,}៛</b>\n"
-        f"🔴 <b>លុយជំពាក់ / Debt:</b> <b>{int(debt):,}៛</b>"
+        "<b>កត់ត្រាការខ្ចីប្រាក់ជោគជ័យ</b>\n\n"
+        f"<b>បុគ្គលិក:</b> <b>{registered_name}</b>\n"
+        f"<b>ថ្ងៃទី:</b> <b>{report_day}</b>\n"
+        f"<b>ខ្ចីលុយ:</b> <b>{int(amount):,}៛</b>\n"
+        f"<b>ប្រាក់កាត់:</b> <b>{int(deduction):,}៛</b>\n"
+        f"<b>លុយជំពាក់:</b> <b>{int(debt):,}៛</b>"
     )

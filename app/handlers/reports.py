@@ -38,7 +38,6 @@ async def report_excel_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if not reports_data:
         await update.message.reply_html(
-            "⚠️ <b>មិនមានទិន្នន័យសម្រាប់កាលបរិច្ឆេទនេះទេ។</b>\n"
             "No data found for the specified period."
         )
         return
@@ -114,14 +113,12 @@ async def report_pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if not reports_data:
         await update.message.reply_html(
-            "⚠️ <b>មិនមានទិន្នន័យសម្រាប់កាលបរិច្ឆេទនេះទេ។</b>\n"
             "No data found for the specified period."
         )
         return
 
     status_message = await update.message.reply_html(
-        "⏳ <b>កំពុងបង្កើតរបាយការណ៍ PDF...</b>\n"
-        "Generating PDF report..."
+        "⏳ Generating PDF report..."
     )
 
     file_path = None

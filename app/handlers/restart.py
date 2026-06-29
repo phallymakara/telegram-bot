@@ -9,6 +9,7 @@ from app.reports.excel import generate_excel_report
 from app.reports.pdf import generate_pdf_report
 
 
+
 async def restartcount_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Ask confirmation before restarting attendance count.
@@ -19,7 +20,6 @@ async def restartcount_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if not reports_data:
         await update.message.reply_html(
-            "ℹ️ <b>មិនមានទិន្នន័យវត្តមានសម្រាប់លុបទេ!</b>\n"
             "There is no attendance data to restart."
         )
         return
@@ -27,11 +27,11 @@ async def restartcount_command(update: Update, context: ContextTypes.DEFAULT_TYP
     keyboard = [
         [
             InlineKeyboardButton(
-                "⚠️ បញ្ជាក់លុប / Confirm Reset",
+                "Reset",
                 callback_data="confirm_restart",
             ),
             InlineKeyboardButton(
-                "❌ បោះបង់ / Cancel",
+                "Cancel",
                 callback_data="cancel_restart",
             ),
         ]
@@ -40,10 +40,7 @@ async def restartcount_command(update: Update, context: ContextTypes.DEFAULT_TYP
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     warning_text = (
-        "⚠️ <b>ការព្រមាន / Warning:</b>\n\n"
-        "តើអ្នកពិតជាចង់កំណត់ការរាប់ឡើងវិញមែនទេ?\n"
-        "រាល់ទិន្នន័យវត្តមាន និងរបាយការណ៍ទាំងអស់នឹងត្រូវបានលុបចេញពីប្រព័ន្ធ។\n\n"
-        "មុនពេលលុប ប្រព័ន្ធនឹងបង្កើតឯកសារ Backup ជា PDF និង Excel ជាមុនសិន។\n\n"
+        "<b>⚠️ Warning:</b>\n\n"
         "Are you sure you want to restart the count?\n"
         "All attendance records and reports will be deleted after backup files are generated."
     )
@@ -61,8 +58,7 @@ async def restartcount_callback(update: Update, context: ContextTypes.DEFAULT_TY
     if query.data == "cancel_restart":
         await query.edit_message_text(
             text=(
-                "❌ <b>បានបោះបង់ការកំណត់ការរាប់ឡើងវិញ!</b>\n"
-                "The restart count operation has been cancelled."
+                "The restart count has been cancelled."
             ),
             parse_mode="HTML",
         )
@@ -154,9 +150,7 @@ async def restartcount_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
         await query.edit_message_text(
             text=(
-                "✅ <b>បានកំណត់ការរាប់ឡើងវិញដោយជោគជ័យ!</b>\n"
-                "រាល់ទិន្នន័យវត្តមាន និងរបាយការណ៍ទាំងអស់ត្រូវបានលុបចេញពីប្រព័ន្ធ។\n\n"
-                "✅ <b>Successfully restarted attendance count!</b>\n"
+                "✅ <b>Successfully restarted</b>\n"
                 "All attendance records and reports have been deleted."
             ),
             parse_mode="HTML",

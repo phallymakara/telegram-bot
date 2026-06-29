@@ -38,13 +38,10 @@ async def addemployees_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if not content:
         await update.message.reply_html(
-            "⚠️ <b>ចម្លងគំរូខាងក្រោម រួចកែសម្រួលដើម្បីចុះឈ្មោះបុគ្គលិក៖</b>\n"
             "<b>Copy and edit the template below to register employees:</b>\n\n"
             "<code>/addemployees\n"
             "ឈ្មោះបុគ្គលិក ប 80000\n"
             "ឈ្មោះបុគ្គលិក ស 65000</code>\n\n"
-            "ប = ប្រុស\n"
-            "ស = ស្រី"
         )
         return
 
@@ -86,7 +83,6 @@ async def updateemployee_command(update: Update, context: ContextTypes.DEFAULT_T
 
     if not command_args or "->" not in command_args:
         await update.message.reply_html(
-            "⚠️ <b>ចម្លងគំរូខាងក្រោម រួចកែសម្រួលដើម្បីប្ដូរឈ្មោះបុគ្គលិក៖</b>\n"
             "<b>Copy and edit the template below to rename an employee:</b>\n\n"
             "<code>/updateemployee ឈ្មោះចាស់ -> ឈ្មោះថ្មី</code>"
         )
@@ -119,7 +115,6 @@ async def deleteemployees_command(update: Update, context: ContextTypes.DEFAULT_
 
     if not content:
         await update.message.reply_html(
-            "⚠️ <b>ចម្លងគំរូខាងក្រោម រួចកែសម្រួលដើម្បីលុបឈ្មោះបុគ្គលិក៖</b>\n"
             "<b>Copy and edit the template below to delete employees:</b>\n\n"
             "<code>/deleteemployees\n"
             "ឈ្មោះបុគ្គលិក</code>"
