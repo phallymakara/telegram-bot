@@ -32,7 +32,7 @@ from database import (
     parse_note_details,
     detect_gender
 )
-from parser import parse_report_text_by_days
+from app.utils.parser import parse_report_text_by_days
 
 # Try importing report generation libraries
 try:
