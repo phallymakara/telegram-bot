@@ -4,4 +4,7 @@ apscheduler
 python-dotenv
 openpyxl
 playwright
+reportlab
+
+# install when already deployed on the server
 # playwright install --with-deps chromium
